@@ -20,10 +20,10 @@ const contract = { tools: [
   { name: "unknown_output", inputSchema: { type: "object", additionalProperties: false } },
 ], resources: [{ uri: "orders://summary", outputSchema: z.toJSONSchema(z.object({ total: z.number() })) }] };
 const dependencies = { orders: contract, "with-hyphen": { tools: [contract.tools[1]] } };
-// A browser view also calls its own server, keyed by the app name (as the CLI does).
+// A browser view also calls its own server, keyed by the reserved name `self` (as the CLI does).
 const request = {
   target: "browser", identity: { name: "checkout", version: "1" }, requires: { orders: { name: "orders", version: "1" } },
-  contracts: { ...dependencies, checkout: contract }, browser_runtime_specifier: "../runtime.mjs", protocol_specifier: "holon-core/protocol",
+  contracts: { ...dependencies, self: contract }, browser_runtime_specifier: "../runtime.mjs", protocol_specifier: "holon-core/protocol",
   entry: "index", banner: "holon-generated-apps-v1 app=checkout",
 };
 rmSync(directory, { recursive: true, force: true });

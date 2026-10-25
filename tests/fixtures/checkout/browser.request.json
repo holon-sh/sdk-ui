@@ -105,7 +105,7 @@
         }
       ]
     },
-    "checkout": {
+    "self": {
       "tools": [
         {
           "name": "get_order",

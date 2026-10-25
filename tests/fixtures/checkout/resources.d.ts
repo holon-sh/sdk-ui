@@ -1,39 +1,39 @@
 // holon-generated-apps-v1 app=checkout
 export interface Inputs {
-  "checkout": {
+  "orders": {
     "orders://summary": {  };
   };
-  "orders": {
+  "self": {
     "orders://summary": {  };
   };
   "with-hyphen": {
   };
 }
 export interface Outputs {
-  "checkout": {
+  "orders": {
     "orders://summary": { "total": number; };
   };
-  "orders": {
+  "self": {
     "orders://summary": { "total": number; };
   };
   "with-hyphen": {
   };
 }
 export interface InputTypes {
-  "checkout": {
+  "orders": {
     "orders://summary": {  };
   };
-  "orders": {
+  "self": {
     "orders://summary": {  };
   };
   "with-hyphen": {
   };
 }
 export interface OutputTypes {
-  "checkout": {
+  "orders": {
     "orders://summary": {  };
   };
-  "orders": {
+  "self": {
     "orders://summary": {  };
   };
   "with-hyphen": {
