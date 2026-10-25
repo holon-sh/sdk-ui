@@ -30,7 +30,8 @@
     "runtime.mjs",
     "runtime.d.ts",
     "generated/",
-    "postinstall.mjs"
+    "postinstall.mjs",
+    "README.md"
   ],
   "scripts": {
     "build": "node scripts/build.mjs",

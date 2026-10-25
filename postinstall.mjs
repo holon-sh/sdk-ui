@@ -9,7 +9,7 @@ if (process.env.HOLON_SKIP_POSTINSTALL !== "1" && process.env.HOLON_POSTINSTALL_
     if (existsSync(join(app, "server.json"))) {
       spawnSync("holon", ["types", "generate", "--no-install", "--quiet"], {
         cwd: app,
-        env: { ...process.env, HOLON_POSTINSTALL_RUNNING: "1" }, // HOLON_PROVIDERS passes through
+        env: { ...process.env, HOLON_POSTINSTALL_RUNNING: "1" },
         stdio: "ignore",
         timeout: 120_000,
       });

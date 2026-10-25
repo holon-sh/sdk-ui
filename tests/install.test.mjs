@@ -18,7 +18,7 @@ test("the packed package installs beside holon-core and its placeholder types re
   const root = temporary(t);
   const info = pack(".", root);
   const paths = info.files.map(file => file.path).sort();
-  assert.deepEqual(paths, ["LICENSE", "generated/holon-generated.json", "generated/index.d.ts", "generated/index.js", "package.json", "postinstall.mjs", "runtime.d.ts", "runtime.mjs"]);
+  assert.deepEqual(paths, ["LICENSE", "README.md", "generated/holon-generated.json", "generated/index.d.ts", "generated/index.js", "package.json", "postinstall.mjs", "runtime.d.ts", "runtime.mjs"]);
   // holon-core is packed from the installed copy until it is on npm; its own dependencies come from the npm cache or registry.
   const core = pack("./node_modules/holon-core", root);
   const consumer = join(root, "consumer");
