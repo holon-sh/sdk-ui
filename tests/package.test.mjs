@@ -24,13 +24,22 @@ test("ordinary NodeNext and Bundler compilation enforces browser bindings, page 
   install(directory, fixture("checkout"));
   symlinkSync(realpathSync(join(repository, "node_modules/zod")), join(root, "node_modules/zod"));
   writeFileSync(join(root, "package.json"), '{"type":"module"}');
-  const source = `import {apps, view, createApps, exposeTools, registerPageTools, ToolCallError, type Resources, type Inputs, type Outputs, type InputTypes, type OutputTypes} from "holon-ui";
-import type {HostBinding} from "holon-ui/runtime";
+  const source = `import {App, createApps, exposeTools, registerPageTools, ToolCallError, type Resources, type Inputs, type Outputs, type InputTypes, type OutputTypes} from "holon-ui";
+import {App as HostApp} from "@modelcontextprotocol/ext-apps";
 import {z} from "zod";
+const view = new App({name: "checkout-view", version: "1.0.0"}, {}, {autoResize: false});
+const host: HostApp = view;
 view.ontoolresult = ({structuredContent}) => structuredContent;
-(await apps.checkout.tools.get_order({orderId:"own"})).total.toFixed();
-// @ts-expect-error only the app's own server is reachable through the host
-apps.orders;
+await view.connect();
+(await view.tools.get_order({orderId:"own"})).total.toFixed();
+const ownSummary: Resources["checkout"]["orders://summary"] = await view.resources["orders://summary"].read();
+ownSummary.total.toFixed();
+const full = await view.callTool({name: "get_order", arguments: {orderId: "own"}});
+if (full.resultType === "complete" && !full.isError) full.structuredContent.total.toFixed();
+// @ts-expect-error
+view.tools.get_order({orderId:1});
+// @ts-expect-error
+view.tools.lookup;
 await registerPageTools({
   move: {description: "Move", inputSchema: z.object({x: z.number()}), execute: ({x}) => x.toFixed()},
   // @ts-expect-error
@@ -38,17 +47,13 @@ await registerPageTools({
 }, {view: {registerTool: () => ({remove() {}})}, signal: new AbortController().signal});
 const browser = createApps({orders:{endpoint:new URL("https://orders.example/mcp"),installationUID:"installation-one"},"with-hyphen":{endpoint:new URL("https://other.example/mcp")}});
 (await browser.orders.tools.get_order({orderId:"browser"})).total.toFixed();
-const host: HostBinding["host"] = {callServerTool: async (params: {name: string; arguments?: Record<string, unknown>}, options?: {signal?: AbortSignal}) => ({content: [], params, options}), readServerResource: async (params: {uri: string}) => ({contents: [], params})};
-const own = createApps({checkout:{host}});
-(await own.checkout.tools.get_order({orderId:"host"})).total.toFixed();
-const ownSummary: Resources["checkout"]["orders://summary"] = await own.checkout.resources["orders://summary"].read();
-ownSummary.total.toFixed();
+const own = createApps({checkout:{endpoint:new URL("https://checkout.example/mcp")}});
 (await own.checkout.listTools()).tools[0]?.description?.toUpperCase();
 if (await exposeTools(own.checkout, {signal: new AbortController().signal, execute: async (name, args) => name + JSON.stringify(args)})) await exposeTools(browser.orders);
 // @ts-expect-error
 createApps({orders:{}});
 // @ts-expect-error
-own.checkout.tools.get_order({orderId:1});
+createApps({checkout:{host: view}});
 // @ts-expect-error
 own.orders;
 const single = createApps({orders:{endpoint:new URL("https://orders.example/mcp")}});
@@ -65,7 +70,7 @@ const total: OutputTypes["orders"]["get_order"]["Total"] = 1;
 const wrongId: InputTypes["orders"]["get_order"]["OrderId"] = total;
 const input: Inputs["checkout"]["get_order"] = {orderId};
 const output: Outputs["checkout"]["get_order"] = {total};
-try { await own.checkout.tools.get_order(input); } catch (error) {
+try { await view.tools.get_order(input); } catch (error) {
   if (error instanceof ToolCallError) error.code.toUpperCase();
 }
 `;
@@ -75,9 +80,10 @@ try { await own.checkout.tools.get_order(input); } catch (error) {
   install(join(isolated, "node_modules/holon-ui"), join(repository, "generated"));
   writeFileSync(join(isolated, "check.ts"), `import {createApps} from "holon-ui";\ncreateApps({});\n// @ts-expect-error\ncreateApps({orders: {endpoint: "https://orders.example/mcp"}});`);
   typecheck(join(isolated, "check.ts"), [ts.ModuleResolutionKind.NodeNext]);
-  const { createApps, apps: own, view } = await import(pathToFileURL(join(directory, "generated/index.js")));
-  assert.deepEqual(Object.keys(own), ["checkout"]);
+  const { createApps, App: View } = await import(pathToFileURL(join(directory, "generated/index.js")));
+  const view = new View({ name: "checkout-view", version: "1" });
   assert.ok(view instanceof App);
+  assert.equal(typeof view.tools.get_order, "function");
   const apps = createApps({ orders: { endpoint: "https://orders.example/mcp" } });
   assert.deepEqual(Object.keys(apps), ["orders"]);
   assert.equal(await apps.orders.tools, apps.orders.tools);

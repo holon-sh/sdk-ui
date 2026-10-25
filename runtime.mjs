@@ -1,36 +1,25 @@
 import { App } from "@modelcontextprotocol/ext-apps";
-import { createApps as create, bindApps as bind, ToolCallError } from "holon-core";
+import { bindApps, ToolCallError } from "holon-core";
 
 export { ToolCallError };
 
-// An MCP Apps host binding routes the app's calls through the host that embeds this view.
-const session = (name, binding) => binding.host && {
-  callTool: (request, { signal, timeout } = {}) => binding.host.callServerTool(request, { signal, timeout }),
-  readResource: (request, { signal, timeout } = {}) => binding.host.readServerResource(request, { signal, timeout }),
-  listTools: () => { throw new Error(`${name} is bound to its host; the host owns the tool catalog.`); },
-};
+export { createApps, bindApps } from "holon-core";
 
-export function createApps(identity, contracts, bindings, options) {
-  return create(identity, contracts, bindings, { ...options, session });
-}
-
-export function bindApps(identity, contracts, bindings, options) {
-  return bind(identity, contracts, bindings, { ...options, session });
-}
-
-// hostApps binds the app's own server (own, its key in contracts) through the MCP Apps host that
-// embeds the page. The returned view is the App; it connects once, on the first call or on the
-// page's own `await view.connect()`, so handlers set on it before either still see the first events.
-export function hostApps(identity, contracts, own) {
-  const view = new App({ name: identity.name, version: identity.version });
-  const connect = view.connect.bind(view);
-  let connected;
-  view.connect = (...args) => (connected ??= connect(...args));
-  const host = {
-    callServerTool: async (request, options) => (await view.connect(), view.callServerTool(request, options)),
-    readServerResource: async (request, options) => (await view.connect(), view.readServerResource(request, options)),
+// appClass returns the ext-apps App with the app's own tools and resources (contracts[own]) typed.
+// Calls go through the host that embeds the page, so connect the App first, as with any App.
+export function appClass(identity, contracts, own) {
+  return class extends App {
+    #client = bindApps(identity, { [own]: contracts[own] }, { [own]: {} }, {
+      session: () => ({
+        callTool: (request, { signal, timeout } = {}) => this.callServerTool(request, { signal, timeout }),
+        readResource: (request, { signal, timeout } = {}) => this.readServerResource(request, { signal, timeout }),
+        listTools: () => { throw new Error("The host owns the tool catalog; bind an endpoint to list tools."); },
+      }),
+    })[own];
+    get tools() { return this.#client.tools; }
+    get resources() { return this.#client.resources; }
+    callTool(request, options) { return this.#client.callTool(request, options); }
   };
-  return { apps: bind(identity, contracts, { [own]: { host } }, { session }), view };
 }
 
 export async function exposeTools(app, options = {}) {
