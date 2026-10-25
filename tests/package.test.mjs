@@ -33,16 +33,16 @@ await registerPageTools({
 const browser = createApps({orders:{endpoint:new URL("https://orders.example/mcp"),installationUID:"installation-one"},"with-hyphen":{endpoint:new URL("https://other.example/mcp")}});
 (await browser.orders.tools.get_order({orderId:"browser"})).total.toFixed();
 const host: HostBinding["host"] = {callServerTool: async (params: {name: string; arguments?: Record<string, unknown>}, options?: {signal?: AbortSignal}) => ({content: [], params, options}), readServerResource: async (params: {uri: string}) => ({contents: [], params})};
-const own = createApps({self:{host}});
-(await own.self.tools.get_order({orderId:"host"})).total.toFixed();
-const ownSummary: Resources["self"]["orders://summary"] = await own.self.resources["orders://summary"].read();
+const own = createApps({checkout:{host}});
+(await own.checkout.tools.get_order({orderId:"host"})).total.toFixed();
+const ownSummary: Resources["checkout"]["orders://summary"] = await own.checkout.resources["orders://summary"].read();
 ownSummary.total.toFixed();
-(await own.self.listTools()).tools[0]?.description?.toUpperCase();
-if (await exposeTools(own.self, {signal: new AbortController().signal, execute: async (name, args) => name + JSON.stringify(args)})) await exposeTools(browser.orders);
+(await own.checkout.listTools()).tools[0]?.description?.toUpperCase();
+if (await exposeTools(own.checkout, {signal: new AbortController().signal, execute: async (name, args) => name + JSON.stringify(args)})) await exposeTools(browser.orders);
 // @ts-expect-error
 createApps({orders:{}});
 // @ts-expect-error
-own.self.tools.get_order({orderId:1});
+own.checkout.tools.get_order({orderId:1});
 // @ts-expect-error
 own.orders;
 const single = createApps({orders:{endpoint:new URL("https://orders.example/mcp")}});
@@ -57,9 +57,9 @@ const orderId: InputTypes["orders"]["get_order"]["OrderId"] = "ord";
 const total: OutputTypes["orders"]["get_order"]["Total"] = 1;
 // @ts-expect-error
 const wrongId: InputTypes["orders"]["get_order"]["OrderId"] = total;
-const input: Inputs["self"]["get_order"] = {orderId};
-const output: Outputs["self"]["get_order"] = {total};
-try { await own.self.tools.get_order(input); } catch (error) {
+const input: Inputs["checkout"]["get_order"] = {orderId};
+const output: Outputs["checkout"]["get_order"] = {total};
+try { await own.checkout.tools.get_order(input); } catch (error) {
   if (error instanceof ToolCallError) error.code.toUpperCase();
 }
 `;
