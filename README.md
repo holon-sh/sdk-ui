@@ -28,7 +28,7 @@ import { ToolCallError, createApps, exposeTools, registerPageTools, type Inputs,
 | `registerPageTools(tools, options?)` | Registers tools implemented by the page itself. |
 | `Inputs`, `Outputs`, `Resources` | Argument, result and resource value types, as `Inputs["dep"]["tool"]`. |
 
-**Your own server is `self`.** The generated clients include one for your own server under the reserved key `self`: `createApps({ self: ... })`, `apps.self.tools.<tool>()`, `Inputs["self"]`. Every other key is a dependency declared in `server.json`; `self` cannot be a `requires` alias.
+Your own server appears under the last segment of its `server.json` name, e.g. `example.com/checkout` → `checkout`: `createApps({ checkout: ... })`, `apps.checkout.tools.<tool>()`, `Inputs["checkout"]`. Every other key is a dependency declared in `server.json`.
 
 ## Bind a client
 
@@ -43,8 +43,8 @@ import { createApps } from "holon-ui";
 const view = new App({ name: "checkout-view", version: "1.0.0" });
 await view.connect();
 
-const apps = createApps({ self: { host: view } });
-const { total } = await apps.self.tools.total({ id: "A-1" });
+const apps = createApps({ checkout: { host: view } });
+const { total } = await apps.checkout.tools.total({ id: "A-1" });
 ```
 
 The host owns the tool catalog, so `listTools`, `exposeTools` and `watch` need an endpoint binding instead.
@@ -53,7 +53,7 @@ The host owns the tool catalog, so `listTools`, `exposeTools` and `watch` need a
 
 ```typescript
 const apps = createApps({
-  self: { endpoint: new URL("/mcp", location.origin) },
+  checkout: { endpoint: new URL("/mcp", location.origin) },
   orders: { endpoint: "https://orders.example.com/mcp" },
 });
 

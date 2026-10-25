@@ -4,13 +4,13 @@ import type { AuthProvider, CallOptions, CallMetadata, ToolResult, ToolClient } 
 export { ToolCallError } from "holon-core/protocol";
 export type { Resources };
 export interface Inputs {
-  "orders": {
+  "checkout": {
     "get_order": { "count"?: number; "orderId": string; [key: string]: unknown; };
     "then": {  };
     "toJSON": {  };
     "unknown_output": {  };
   };
-  "self": {
+  "orders": {
     "get_order": { "count"?: number; "orderId": string; [key: string]: unknown; };
     "then": {  };
     "toJSON": {  };
@@ -21,13 +21,13 @@ export interface Inputs {
   };
 }
 export interface Outputs {
-  "orders": {
+  "checkout": {
     "get_order": { "total": number; };
     "then": unknown;
     "toJSON": unknown;
     "unknown_output": unknown;
   };
-  "self": {
+  "orders": {
     "get_order": { "total": number; };
     "then": unknown;
     "toJSON": unknown;
@@ -38,13 +38,13 @@ export interface Outputs {
   };
 }
 export interface InputTypes {
-  "orders": {
+  "checkout": {
     "get_order": { "OrderId": string; };
     "then": {  };
     "toJSON": {  };
     "unknown_output": {  };
   };
-  "self": {
+  "orders": {
     "get_order": { "OrderId": string; };
     "then": {  };
     "toJSON": {  };
@@ -55,13 +55,13 @@ export interface InputTypes {
   };
 }
 export interface OutputTypes {
-  "orders": {
+  "checkout": {
     "get_order": { "Total": number; };
     "then": {  };
     "toJSON": {  };
     "unknown_output": {  };
   };
-  "self": {
+  "orders": {
     "get_order": { "Total": number; };
     "then": {  };
     "toJSON": {  };

@@ -21,22 +21,22 @@ test("browser bindings call the app's own tools directly or through an MCP Apps 
   const summary = z.toJSONSchema(output);
   const contract = { tools: [{ name: "get_order", inputSchema: z.toJSONSchema(input, { io: "input" }), outputSchema: summary }], resources: [{ uri: "orders://summary", outputSchema: summary }, { uri: "orders://broken", outputSchema: summary }] };
   const identity = { name: "chat-web", version: "1", requires: {} };
-  const direct = createApps(identity, { self: contract }, { self: { endpoint } });
-  t.after(() => direct.self.close());
-  assert.deepEqual(await direct.self.tools.get_order({ id: "abc" }), { total: 3 });
-  assert.deepEqual(await direct.self.resources["orders://summary"].read(), { total: 3 });
-  await assert.rejects(direct.self.resources["orders://broken"].read(), /Invalid contents/);
-  assert.equal(await exposeTools(direct.self), false);
+  const direct = createApps(identity, { chat: contract }, { chat: { endpoint } });
+  t.after(() => direct.chat.close());
+  assert.deepEqual(await direct.chat.tools.get_order({ id: "abc" }), { total: 3 });
+  assert.deepEqual(await direct.chat.resources["orders://summary"].read(), { total: 3 });
+  await assert.rejects(direct.chat.resources["orders://broken"].read(), /Invalid contents/);
+  assert.equal(await exposeTools(direct.chat), false);
   const registered = [];
   globalThis.document = { modelContext: { registerTool: async (tool, options) => { registered.push({ tool, options }); } } };
   const signal = new AbortController().signal;
-  assert.equal(await exposeTools(direct.self, { signal }), true);
+  assert.equal(await exposeTools(direct.chat, { signal }), true);
   assert.deepEqual(registered.map(({ tool, options }) => [tool.name, tool.description, tool.annotations.readOnlyHint, options.signal]), [["get_order", "Read one order", true, signal]]);
   const executed = await registered[0].tool.execute({ id: "abcd" });
   assert.equal(executed.resultType, "complete");
   assert.deepEqual(executed.structuredContent, { total: 4 });
   const custom = [];
-  await exposeTools(direct.self, { execute: async (name, args) => { custom.push([name, args]); return "custom"; } });
+  await exposeTools(direct.chat, { execute: async (name, args) => { custom.push([name, args]); return "custom"; } });
   assert.equal(await registered[1].tool.execute({ id: "z" }), "custom");
   assert.deepEqual(custom, [["get_order", { id: "z" }]]);
 
@@ -45,13 +45,13 @@ test("browser bindings call the app's own tools directly or through an MCP Apps 
     callServerTool: async (params, options) => { calls.push([params, options?.signal]); return params.arguments.id === "bad" ? { content: [], structuredContent: { total: "no" } } : { content: [{ type: "text", text: "hosted" }], structuredContent: { total: 9 } }; },
     readServerResource: async ({ uri }) => ({ contents: [{ uri, mimeType: "application/json", text: JSON.stringify({ total: 1 }) }] }),
   };
-  const hosted = createApps(identity, { self: contract }, { self: { host } });
-  assert.deepEqual(await hosted.self.tools.get_order({ id: "x" }, { signal }), { total: 9 });
-  assert.deepEqual(await hosted.self.resources["orders://summary"].read(), { total: 1 });
+  const hosted = createApps(identity, { chat: contract }, { chat: { host } });
+  assert.deepEqual(await hosted.chat.tools.get_order({ id: "x" }, { signal }), { total: 9 });
+  assert.deepEqual(await hosted.chat.resources["orders://summary"].read(), { total: 1 });
   assert.deepEqual(calls, [[{ name: "get_order", arguments: { id: "x" } }, signal]]);
-  await assert.rejects(hosted.self.tools.get_order({ id: 1 }), /Invalid arguments/);
-  await assert.rejects(exposeTools(hosted.self), /bound to its host/);
-  await hosted.self.close();
+  await assert.rejects(hosted.chat.tools.get_order({ id: 1 }), /Invalid arguments/);
+  await assert.rejects(exposeTools(hosted.chat), /bound to its host/);
+  await hosted.chat.close();
 });
 
 test("host bindings cannot watch resources", async () => {
