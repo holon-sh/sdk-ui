@@ -17,35 +17,35 @@ Declare `holon-ui` in the app root's `package.json` even when the view's sources
 ## The generated module
 
 ```typescript
-import { ToolCallError, apps, view, createApps, exposeTools, registerPageTools, type Inputs, type Outputs, type Resources } from "holon-ui";
+import { App, ToolCallError, createApps, exposeTools, registerPageTools, type Inputs, type Outputs, type Resources } from "holon-ui";
 ```
 
 | Export | What it is |
 |---|---|
-| `apps` | A client for your own server, bound through the MCP Apps host that embeds the page. |
-| `view` | The `App` from `@modelcontextprotocol/ext-apps` that `apps` connects through. It connects on the first tool call, or when you `await view.connect()`. |
-| `createApps(bindings, options?)` | Clients for the servers you bind explicitly, keyed like `bindings`. |
+| `App` | The `App` from `@modelcontextprotocol/ext-apps` with your own server's `tools`, `resources` and `callTool` typed. Calls go through the host that embeds the page. |
+| `createApps(bindings, options?)` | Clients for servers you reach by endpoint, keyed like `bindings`. |
 | `ToolCallError` | Thrown by `tools.<tool>` when a tool reports an error or asks for more input. |
 | `exposeTools(client, options?)` | Registers a client's tools with the page's WebMCP agent. |
 | `registerPageTools(tools, options?)` | Registers tools implemented by the page itself. |
 | `Inputs`, `Outputs`, `Resources` | Argument, result and resource value types, as `Inputs["dep"]["tool"]`. |
 
-Your own server appears under the last segment of its `server.json` name, e.g. `example.com/checkout` → `checkout`: `createApps({ checkout: ... })`, `apps.checkout.tools.<tool>()`, `Inputs["checkout"]`. Every other key is a dependency declared in `server.json`.
+Your own server appears under the last segment of its `server.json` name, e.g. `example.com/checkout` → `checkout`: `Inputs["checkout"]`, `Outputs["checkout"]`, and `createApps({ checkout: { endpoint } })` for a standalone page. Every other key is a dependency declared in `server.json`.
 
 ## Bind a client
 
 ### Inside an MCP Apps host
 
-A view embedded in an MCP Apps host calls its own server through the host, which owns the connection and the credentials. `apps` is already bound that way:
+A view embedded in an MCP Apps host calls its own server through the host, which owns the connection and the credentials. Construct and connect `App` exactly as you would the one from `@modelcontextprotocol/ext-apps`; it is that class with typed members added:
 
 ```typescript
-import { apps, view } from "holon-ui";
+import { App } from "holon-ui";
 
-view.ontoolresult = ({ structuredContent }) => render(structuredContent); // set handlers before the first call
-const { total } = await apps.checkout.tools.total({ id: "A-1" });
+const view = new App({ name: "checkout-view", version: "1.0.0" });
+view.ontoolresult = ({ structuredContent }) => render(structuredContent);
+await view.connect();
+
+const { total } = await view.tools.total({ id: "A-1" });
 ```
-
-`view` connects on that first call. To connect earlier, `await view.connect()`; the clients reuse the connection. To bind a different `App` yourself, use `createApps({ checkout: { host: myApp } })`.
 
 The host owns the tool catalog, so `listTools`, `exposeTools` and `watch` need an endpoint binding instead.
 
@@ -125,7 +125,7 @@ Then serve `dist/index.html` from the server with `appView` from `holon-sh/view`
 
 ## Low-level runtime
 
-`holon-ui/runtime` exports what the generated module calls: `createApps(identity, contracts, bindings?, options?)`, `bindApps`, `hostApps(identity, contracts, own)`, `exposeTools`, `registerPageTools`, `ToolCallError`, and the `HostBinding`, `EndpointBinding` and page-tool types. Apps use the generated module instead.
+`holon-ui/runtime` exports what the generated module calls: `createApps(identity, contracts, bindings?, options?)`, `bindApps`, `appClass(identity, contracts, own)`, `exposeTools`, `registerPageTools`, `ToolCallError`, and the `EndpointBinding`, `View` and page-tool types. Apps use the generated module instead.
 
 ## Develop
 

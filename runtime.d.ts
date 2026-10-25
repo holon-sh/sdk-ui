@@ -4,18 +4,12 @@ export type { Binding as EndpointBinding, Identity, Contract, RuntimeClient } fr
 export type { AuthProvider, CallOptions, CallMetadata, ToolResult, ToolClient } from "holon-core";
 export { ToolCallError } from "holon-core";
 
-/** Routes an app's calls through the MCP Apps host that embeds this view. */
-export interface HostBinding {
-  host: {
-    callServerTool(params: { name: string; arguments?: Record<string, unknown> }, options?: { signal?: AbortSignal }): Promise<unknown>;
-    readServerResource(params: { uri: string }, options?: { signal?: AbortSignal }): Promise<unknown>;
-  };
-}
 export interface CreateOptions { validator?: (schema: object) => (value: unknown) => boolean }
-export declare function createApps(identity: Identity, contracts: Record<string, Contract | null>, bindings?: Record<string, EndpointBinding | HostBinding>, options?: CreateOptions): Readonly<Record<string, RuntimeClient>>;
-export declare function bindApps(identity: Identity, contracts: Record<string, Contract | null>, bindings: Record<string, EndpointBinding | HostBinding>, options?: CreateOptions): Readonly<Record<string, RuntimeClient>>;
-/** Clients for the app's own server, reached through the MCP Apps host that embeds the page; `view` connects on first use. */
-export declare function hostApps(identity: Identity, contracts: Record<string, Contract | null>, own: string): { apps: Readonly<Record<string, RuntimeClient>>; view: App };
+export declare function createApps(identity: Identity, contracts: Record<string, Contract | null>, bindings?: Record<string, EndpointBinding>, options?: CreateOptions): Readonly<Record<string, RuntimeClient>>;
+export declare function bindApps(identity: Identity, contracts: Record<string, Contract | null>, bindings: Record<string, EndpointBinding>, options?: CreateOptions): Readonly<Record<string, RuntimeClient>>;
+/** The ext-apps App with the app's own tools and resources typed; calls go through the host that embeds the page. */
+export type View = App & Pick<RuntimeClient, "tools" | "resources" | "callTool">;
+export declare function appClass(identity: Identity, contracts: Record<string, Contract | null>, own: string): new (...args: ConstructorParameters<typeof App>) => View;
 export interface ExposeOptions { signal?: AbortSignal; execute?: (name: string, args: Record<string, unknown>) => Promise<unknown> }
 export declare function exposeTools(app: Pick<RuntimeClient, "callTool" | "listTools">, options?: ExposeOptions): Promise<boolean>;
 export type PageResult<I> = { readonly value: I; readonly issues?: undefined } | { readonly issues: ReadonlyArray<{ readonly message: string }> };

@@ -5,10 +5,10 @@ import { z } from "zod";
 import { App } from "@modelcontextprotocol/ext-apps";
 import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { createApps, bindApps, hostApps, exposeTools, registerPageTools } from "holon-ui/runtime";
+import { createApps, bindApps, appClass, exposeTools, registerPageTools } from "holon-ui/runtime";
 import { serve } from "./helpers.mjs";
 
-test("browser bindings call the app's own tools directly or through an MCP Apps host and expose them to WebMCP", { timeout: 10000 }, async t => {
+test("endpoint bindings call tools directly and expose them to WebMCP", { timeout: 10000 }, async t => {
   const input = z.strictObject({ id: z.string() });
   const output = z.object({ total: z.number() });
   const { endpoint } = await serve(t, () => {
@@ -43,72 +43,35 @@ test("browser bindings call the app's own tools directly or through an MCP Apps 
   assert.equal(await registered[1].tool.execute({ id: "z" }), "custom");
   assert.deepEqual(custom, [["get_order", { id: "z" }]]);
 
-  const calls = [];
-  const host = {
-    callServerTool: async (params, options) => { calls.push([params, options?.signal]); return params.arguments.id === "bad" ? { content: [], structuredContent: { total: "no" } } : { content: [{ type: "text", text: "hosted" }], structuredContent: { total: 9 } }; },
-    readServerResource: async ({ uri }) => ({ contents: [{ uri, mimeType: "application/json", text: JSON.stringify({ total: 1 }) }] }),
-  };
-  const hosted = createApps(identity, { chat: contract }, { chat: { host } });
-  assert.deepEqual(await hosted.chat.tools.get_order({ id: "x" }, { signal }), { total: 9 });
-  assert.deepEqual(await hosted.chat.resources["orders://summary"].read(), { total: 1 });
-  assert.deepEqual(calls, [[{ name: "get_order", arguments: { id: "x" } }, signal]]);
-  await assert.rejects(hosted.chat.tools.get_order({ id: 1 }), /Invalid arguments/);
-  await assert.rejects(exposeTools(hosted.chat), /bound to its host/);
-  await hosted.chat.close();
 });
 
-test("hostApps connects its App once and routes the app's own calls through it", async t => {
-  const connect = App.prototype.connect;
-  let connections = 0;
-  App.prototype.connect = async function () { connections += 1; };
-  t.after(() => { App.prototype.connect = connect; });
-  const contract = { tools: [{ name: "get_order", inputSchema: z.toJSONSchema(z.strictObject({ id: z.string() })), outputSchema: z.toJSONSchema(z.object({ total: z.number() })) }] };
-  const { apps, view } = hostApps({ name: "example.com/checkout", version: "1", requires: { orders: { name: "orders", version: "1" } } }, { checkout: contract, orders: contract }, "checkout");
+test("the App class calls the app's own tools and resources through a real MCP Apps host", async t => {
+  const input = z.strictObject({ id: z.string() });
+  const summary = z.toJSONSchema(z.object({ total: z.number() }));
+  const contract = { tools: [{ name: "get_order", inputSchema: z.toJSONSchema(input, { io: "input" }), outputSchema: summary }], resources: [{ uri: "orders://summary", outputSchema: summary }] };
+  const View = appClass({ name: "example.com/checkout", version: "1", requires: {} }, { checkout: contract }, "checkout");
+  const view = new View({ name: "checkout-view", version: "1" }, {}, { autoResize: false });
   assert.ok(view instanceof App);
-  assert.deepEqual(Object.keys(apps), ["checkout"]);
-  const calls = [];
-  view.callServerTool = async (params, options) => { calls.push([params, options?.signal]); return { content: [], structuredContent: { total: params.arguments.id.length } }; };
-  assert.equal(connections, 0);
-  const signal = new AbortController().signal;
-  assert.deepEqual(await apps.checkout.tools.get_order({ id: "abc" }, { signal }), { total: 3 });
-  assert.deepEqual(await apps.checkout.tools.get_order({ id: "abcd" }), { total: 4 });
-  await view.connect();
-  assert.equal(connections, 1);
-  assert.deepEqual(calls, [[{ name: "get_order", arguments: { id: "abc" } }, signal], [{ name: "get_order", arguments: { id: "abcd" } }, undefined]]);
-  await assert.rejects(apps.checkout.tools.get_order({ id: 1 }), /Invalid arguments/);
-  assert.equal(apps.orders, undefined);
-});
-
-test("hostApps completes the MCP Apps handshake with a real host and reuses that connection", async t => {
-  // Hosts drive resizing from the DOM; a Node test has none.
-  const resize = App.prototype.setupSizeChangedNotifications;
-  App.prototype.setupSizeChangedNotifications = () => () => {};
-  t.after(() => { App.prototype.setupSizeChangedNotifications = resize; });
-  const contract = { tools: [{ name: "get_order", inputSchema: z.toJSONSchema(z.strictObject({ id: z.string() })), outputSchema: z.toJSONSchema(z.object({ total: z.number() })) }] };
-  const { apps, view } = hostApps({ name: "example.com/checkout", version: "1", requires: {} }, { checkout: contract }, "checkout");
   const bridge = new AppBridge(null, { name: "host", version: "1" }, {});
   const served = [];
-  bridge.oncalltool = async params => { served.push(params); return { content: [], structuredContent: { total: params.arguments.id.length } }; };
+  bridge.oncalltool = async ({ name, arguments: args }) => { served.push([name, args]); return args.id === "bad" ? { content: [], structuredContent: { total: "no" } } : { content: [], structuredContent: { total: args.id.length } }; };
+  bridge.onreadresource = async ({ uri }) => ({ contents: [{ uri, mimeType: "application/json", text: JSON.stringify({ total: 1 }) }] });
   const [viewTransport, hostTransport] = InMemoryTransport.createLinkedPair();
   await bridge.connect(hostTransport);
   const results = [];
   view.ontoolresult = result => results.push(result.structuredContent);
-  // The page may connect first; the clients then share that connection instead of opening another.
   await view.connect(viewTransport);
   await bridge.sendToolResult({ content: [], structuredContent: { total: 1 } });
-  assert.deepEqual(await apps.checkout.tools.get_order({ id: "abc" }), { total: 3 });
-  await view.connect();
-  assert.deepEqual(served.map(({ name, arguments: args }) => [name, args]), [["get_order", { id: "abc" }]]);
+  assert.deepEqual(await view.tools.get_order({ id: "abc" }), { total: 3 });
+  assert.deepEqual(await view.resources["orders://summary"].read(), { total: 1 });
+  assert.equal((await view.callTool({ name: "get_order", arguments: { id: "abcd" } })).structuredContent.total, 4);
+  await assert.rejects(view.tools.get_order({ id: 1 }), /Invalid arguments/);
+  await assert.rejects(view.tools.get_order({ id: "bad" }), /Invalid structured output from checkout\.get_order/);
+  await assert.rejects(view.resources["orders://summary"].watch(() => {}), /endpoint binding/);
+  assert.deepEqual(served, [["get_order", { id: "abc" }], ["get_order", { id: "abcd" }], ["get_order", { id: "bad" }]]);
   assert.deepEqual(results, [{ total: 1 }]);
   await view.close();
   await bridge.close();
-});
-
-test("host bindings cannot watch resources", async () => {
-  const uri = "orders://summary";
-  const contract = { tools: [], resources: [{ uri, outputSchema: z.toJSONSchema(z.object({ total: z.number() })) }] };
-  const hosted = createApps({ name: "script", version: "1", requires: {} }, { orders: contract }, { orders: { host: { callServerTool: async () => ({}), readServerResource: async () => ({ contents: [{ text: '{"total":3}' }] }) } } });
-  await assert.rejects(hosted.orders.resources[uri].watch(() => {}), /endpoint binding/);
 });
 
 test("page tools register with the MCP Apps host when embedded and with WebMCP when standalone", async t => {
@@ -143,8 +106,7 @@ test("createApps validates with the caller's validator when one is given", async
   const schemas = [];
   const validator = schema => { schemas.push(schema); return Object.assign(() => false, { errors: ["rejected"] }); };
   const contracts = { orders: { tools: [{ name: "get", inputSchema: { type: "object" } }] } };
-  const host = { callServerTool: () => assert.fail("invalid arguments reached the host"), readServerResource: () => assert.fail("unexpected read") };
-  const apps = bindApps({ name: "checkout", version: "1", requires: {} }, contracts, { orders: { host } }, { validator });
+  const apps = bindApps({ name: "checkout", version: "1", requires: {} }, contracts, { orders: { endpoint: "https://orders.invalid/mcp" } }, { validator });
   await assert.rejects(apps.orders.tools.get({}), /Invalid arguments for orders\.get: \["rejected"\]/);
   assert.deepEqual(schemas, [{ type: "object" }]);
 });
