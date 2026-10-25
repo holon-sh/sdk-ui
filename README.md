@@ -17,12 +17,14 @@ Declare `holon-ui` in the app root's `package.json` even when the view's sources
 ## The generated module
 
 ```typescript
-import { ToolCallError, createApps, exposeTools, registerPageTools, type Inputs, type Outputs, type Resources } from "holon-ui";
+import { ToolCallError, apps, view, createApps, exposeTools, registerPageTools, type Inputs, type Outputs, type Resources } from "holon-ui";
 ```
 
 | Export | What it is |
 |---|---|
-| `createApps(bindings, options?)` | Clients for the dependencies you bind, keyed like `bindings`. There is no `apps` export: a browser has no environment variables, so every client is bound explicitly. |
+| `apps` | A client for your own server, bound through the MCP Apps host that embeds the page. |
+| `view` | The `App` from `@modelcontextprotocol/ext-apps` that `apps` connects through. It connects on the first tool call, or when you `await view.connect()`. |
+| `createApps(bindings, options?)` | Clients for the servers you bind explicitly, keyed like `bindings`. |
 | `ToolCallError` | Thrown by `tools.<tool>` when a tool reports an error or asks for more input. |
 | `exposeTools(client, options?)` | Registers a client's tools with the page's WebMCP agent. |
 | `registerPageTools(tools, options?)` | Registers tools implemented by the page itself. |
@@ -34,18 +36,16 @@ Your own server appears under the last segment of its `server.json` name, e.g. `
 
 ### Inside an MCP Apps host
 
-A view embedded in an MCP Apps host calls its own server through the host, which owns the connection and the credentials. Pass the `App` from `@modelcontextprotocol/ext-apps`:
+A view embedded in an MCP Apps host calls its own server through the host, which owns the connection and the credentials. `apps` is already bound that way:
 
 ```typescript
-import { App } from "@modelcontextprotocol/ext-apps";
-import { createApps } from "holon-ui";
+import { apps, view } from "holon-ui";
 
-const view = new App({ name: "checkout-view", version: "1.0.0" });
-await view.connect();
-
-const apps = createApps({ checkout: { host: view } });
+view.ontoolresult = ({ structuredContent }) => render(structuredContent); // set handlers before the first call
 const { total } = await apps.checkout.tools.total({ id: "A-1" });
 ```
+
+`view` connects on that first call. To connect earlier, `await view.connect()`; the clients reuse the connection. To bind a different `App` yourself, use `createApps({ checkout: { host: myApp } })`.
 
 The host owns the tool catalog, so `listTools`, `exposeTools` and `watch` need an endpoint binding instead.
 
@@ -125,7 +125,7 @@ Then serve `dist/index.html` from the server with `appView` from `holon-sh/view`
 
 ## Low-level runtime
 
-`holon-ui/runtime` exports what the generated module calls: `createApps(identity, contracts, bindings?, options?)`, `bindApps`, `exposeTools`, `registerPageTools`, `ToolCallError`, and the `HostBinding`, `EndpointBinding` and page-tool types. Apps use the generated module instead.
+`holon-ui/runtime` exports what the generated module calls: `createApps(identity, contracts, bindings?, options?)`, `bindApps`, `hostApps(identity, contracts, own)`, `exposeTools`, `registerPageTools`, `ToolCallError`, and the `HostBinding`, `EndpointBinding` and page-tool types. Apps use the generated module instead.
 
 ## Develop
 

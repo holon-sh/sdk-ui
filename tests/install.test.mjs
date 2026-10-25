@@ -35,8 +35,10 @@ test("the packed package installs beside holon-core and its placeholder types re
   const placeholder = await import(pathToFileURL(join(directory, "generated/index.js")));
   assert.deepEqual(Object.keys(placeholder.createApps({})), []);
   assert.throws(() => placeholder.createApps({ unknown: { endpoint: "https://example.com/mcp" } }), /Unknown app binding/);
+  assert.throws(() => placeholder.apps.checkout, /Run holon types generate/);
   const source = join(consumer, "consumer.ts");
-  writeFileSync(source, `import { createApps, registerPageTools, type Apps } from "holon-ui";
+  writeFileSync(source, `import { apps, createApps, registerPageTools, type Apps } from "holon-ui";
+const placeholder: Apps = apps;
 import type { HostBinding } from "holon-ui/runtime";
 const empty: Apps = createApps({});
 const host: HostBinding = { host: { callServerTool: async () => ({}), readServerResource: async () => ({}) } };

@@ -1,3 +1,4 @@
+import type { App } from "@modelcontextprotocol/ext-apps";
 import type { Binding as EndpointBinding, Identity, Contract, RuntimeClient } from "holon-core";
 export type { Binding as EndpointBinding, Identity, Contract, RuntimeClient } from "holon-core";
 export type { AuthProvider, CallOptions, CallMetadata, ToolResult, ToolClient } from "holon-core";
@@ -13,6 +14,8 @@ export interface HostBinding {
 export interface CreateOptions { validator?: (schema: object) => (value: unknown) => boolean }
 export declare function createApps(identity: Identity, contracts: Record<string, Contract | null>, bindings?: Record<string, EndpointBinding | HostBinding>, options?: CreateOptions): Readonly<Record<string, RuntimeClient>>;
 export declare function bindApps(identity: Identity, contracts: Record<string, Contract | null>, bindings: Record<string, EndpointBinding | HostBinding>, options?: CreateOptions): Readonly<Record<string, RuntimeClient>>;
+/** Clients for the app's own server, reached through the MCP Apps host that embeds the page; `view` connects on first use. */
+export declare function hostApps(identity: Identity, contracts: Record<string, Contract | null>, own: string): { apps: Readonly<Record<string, RuntimeClient>>; view: App };
 export interface ExposeOptions { signal?: AbortSignal; execute?: (name: string, args: Record<string, unknown>) => Promise<unknown> }
 export declare function exposeTools(app: Pick<RuntimeClient, "callTool" | "listTools">, options?: ExposeOptions): Promise<boolean>;
 export type PageResult<I> = { readonly value: I; readonly issues?: undefined } | { readonly issues: ReadonlyArray<{ readonly message: string }> };

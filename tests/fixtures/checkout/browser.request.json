@@ -192,5 +192,6 @@
   "browser_runtime_specifier": "../runtime.mjs",
   "protocol_specifier": "holon-core/protocol",
   "entry": "index",
+  "own": "checkout",
   "banner": "holon-generated-apps-v1 app=checkout"
 }

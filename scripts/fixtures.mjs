@@ -24,7 +24,7 @@ const dependencies = { orders: contract, "with-hyphen": { tools: [contract.tools
 const request = {
   target: "browser", identity: { name: "checkout", version: "1" }, requires: { orders: { name: "orders", version: "1" } },
   contracts: { ...dependencies, checkout: contract }, browser_runtime_specifier: "../runtime.mjs", protocol_specifier: "holon-core/protocol",
-  entry: "index", banner: "holon-generated-apps-v1 app=checkout",
+  entry: "index", own: "checkout", banner: "holon-generated-apps-v1 app=checkout",
 };
 rmSync(directory, { recursive: true, force: true });
 mkdirSync(directory, { recursive: true });

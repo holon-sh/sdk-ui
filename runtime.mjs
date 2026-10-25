@@ -1,3 +1,4 @@
+import { App } from "@modelcontextprotocol/ext-apps";
 import { createApps as create, bindApps as bind, ToolCallError } from "holon-core";
 
 export { ToolCallError };
@@ -15,6 +16,21 @@ export function createApps(identity, contracts, bindings, options) {
 
 export function bindApps(identity, contracts, bindings, options) {
   return bind(identity, contracts, bindings, { ...options, session });
+}
+
+// hostApps binds the app's own server (own, its key in contracts) through the MCP Apps host that
+// embeds the page. The returned view is the App; it connects once, on the first call or on the
+// page's own `await view.connect()`, so handlers set on it before either still see the first events.
+export function hostApps(identity, contracts, own) {
+  const view = new App({ name: identity.name, version: identity.version });
+  const connect = view.connect.bind(view);
+  let connected;
+  view.connect = (...args) => (connected ??= connect(...args));
+  const host = {
+    callServerTool: async (request, options) => (await view.connect(), view.callServerTool(request, options)),
+    readServerResource: async (request, options) => (await view.connect(), view.readServerResource(request, options)),
+  };
+  return { apps: bind(identity, contracts, { [own]: { host } }, { session }), view };
 }
 
 export async function exposeTools(app, options = {}) {

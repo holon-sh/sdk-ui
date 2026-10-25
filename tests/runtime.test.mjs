@@ -2,7 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { createApps, bindApps, exposeTools, registerPageTools } from "holon-ui/runtime";
+import { App } from "@modelcontextprotocol/ext-apps";
+import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { createApps, bindApps, hostApps, exposeTools, registerPageTools } from "holon-ui/runtime";
 import { serve } from "./helpers.mjs";
 
 test("browser bindings call the app's own tools directly or through an MCP Apps host and expose them to WebMCP", { timeout: 10000 }, async t => {
@@ -52,6 +55,53 @@ test("browser bindings call the app's own tools directly or through an MCP Apps 
   await assert.rejects(hosted.chat.tools.get_order({ id: 1 }), /Invalid arguments/);
   await assert.rejects(exposeTools(hosted.chat), /bound to its host/);
   await hosted.chat.close();
+});
+
+test("hostApps connects its App once and routes the app's own calls through it", async t => {
+  const connect = App.prototype.connect;
+  let connections = 0;
+  App.prototype.connect = async function () { connections += 1; };
+  t.after(() => { App.prototype.connect = connect; });
+  const contract = { tools: [{ name: "get_order", inputSchema: z.toJSONSchema(z.strictObject({ id: z.string() })), outputSchema: z.toJSONSchema(z.object({ total: z.number() })) }] };
+  const { apps, view } = hostApps({ name: "example.com/checkout", version: "1", requires: { orders: { name: "orders", version: "1" } } }, { checkout: contract, orders: contract }, "checkout");
+  assert.ok(view instanceof App);
+  assert.deepEqual(Object.keys(apps), ["checkout"]);
+  const calls = [];
+  view.callServerTool = async (params, options) => { calls.push([params, options?.signal]); return { content: [], structuredContent: { total: params.arguments.id.length } }; };
+  assert.equal(connections, 0);
+  const signal = new AbortController().signal;
+  assert.deepEqual(await apps.checkout.tools.get_order({ id: "abc" }, { signal }), { total: 3 });
+  assert.deepEqual(await apps.checkout.tools.get_order({ id: "abcd" }), { total: 4 });
+  await view.connect();
+  assert.equal(connections, 1);
+  assert.deepEqual(calls, [[{ name: "get_order", arguments: { id: "abc" } }, signal], [{ name: "get_order", arguments: { id: "abcd" } }, undefined]]);
+  await assert.rejects(apps.checkout.tools.get_order({ id: 1 }), /Invalid arguments/);
+  assert.equal(apps.orders, undefined);
+});
+
+test("hostApps completes the MCP Apps handshake with a real host and reuses that connection", async t => {
+  // Hosts drive resizing from the DOM; a Node test has none.
+  const resize = App.prototype.setupSizeChangedNotifications;
+  App.prototype.setupSizeChangedNotifications = () => () => {};
+  t.after(() => { App.prototype.setupSizeChangedNotifications = resize; });
+  const contract = { tools: [{ name: "get_order", inputSchema: z.toJSONSchema(z.strictObject({ id: z.string() })), outputSchema: z.toJSONSchema(z.object({ total: z.number() })) }] };
+  const { apps, view } = hostApps({ name: "example.com/checkout", version: "1", requires: {} }, { checkout: contract }, "checkout");
+  const bridge = new AppBridge(null, { name: "host", version: "1" }, {});
+  const served = [];
+  bridge.oncalltool = async params => { served.push(params); return { content: [], structuredContent: { total: params.arguments.id.length } }; };
+  const [viewTransport, hostTransport] = InMemoryTransport.createLinkedPair();
+  await bridge.connect(hostTransport);
+  const results = [];
+  view.ontoolresult = result => results.push(result.structuredContent);
+  // The page may connect first; the clients then share that connection instead of opening another.
+  await view.connect(viewTransport);
+  await bridge.sendToolResult({ content: [], structuredContent: { total: 1 } });
+  assert.deepEqual(await apps.checkout.tools.get_order({ id: "abc" }), { total: 3 });
+  await view.connect();
+  assert.deepEqual(served.map(({ name, arguments: args }) => [name, args]), [["get_order", { id: "abc" }]]);
+  assert.deepEqual(results, [{ total: 1 }]);
+  await view.close();
+  await bridge.close();
 });
 
 test("host bindings cannot watch resources", async () => {

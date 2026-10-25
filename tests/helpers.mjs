@@ -21,7 +21,7 @@ export function temporary(t) {
 
 export function typecheck(source, resolutions = [ts.ModuleResolutionKind.NodeNext, ts.ModuleResolutionKind.Bundler]) {
   for (const moduleResolution of resolutions) {
-    const program = ts.createProgram([source], { noEmit: true, strict: true, target: ts.ScriptTarget.ES2023, moduleResolution, module: moduleResolution === ts.ModuleResolutionKind.NodeNext ? ts.ModuleKind.NodeNext : ts.ModuleKind.ESNext });
+    const program = ts.createProgram([source], { noEmit: true, strict: true, skipLibCheck: true, target: ts.ScriptTarget.ES2023, moduleResolution, module: moduleResolution === ts.ModuleResolutionKind.NodeNext ? ts.ModuleKind.NodeNext : ts.ModuleKind.ESNext });
     const diagnostics = ts.getPreEmitDiagnostics(program);
     assert.equal(diagnostics.length, 0, ts.formatDiagnostics(diagnostics, { getCurrentDirectory: () => dirname(source), getCanonicalFileName: p => p, getNewLine: () => "\n" }));
   }

@@ -4,6 +4,7 @@ import { writeFileSync, copyFileSync, symlinkSync, cpSync, realpathSync } from "
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
+import { App } from "@modelcontextprotocol/ext-apps";
 import { fixture, temporary, typecheck } from "./helpers.mjs";
 
 const repository = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -14,6 +15,7 @@ function install(directory, generated) {
   cpSync(generated, join(directory, "generated"), { recursive: true });
   for (const name of ["runtime.mjs", "runtime.d.ts", "package.json"]) copyFileSync(join(repository, name), join(directory, name));
   symlinkSync(realpathSync(join(repository, "node_modules/holon-core")), join(dirname(directory), "holon-core"));
+  symlinkSync(realpathSync(join(repository, "node_modules/@modelcontextprotocol")), join(dirname(directory), "@modelcontextprotocol"));
 }
 
 test("ordinary NodeNext and Bundler compilation enforces browser bindings, page tools, and tool contracts", async t => {
@@ -22,9 +24,13 @@ test("ordinary NodeNext and Bundler compilation enforces browser bindings, page 
   install(directory, fixture("checkout"));
   symlinkSync(realpathSync(join(repository, "node_modules/zod")), join(root, "node_modules/zod"));
   writeFileSync(join(root, "package.json"), '{"type":"module"}');
-  const source = `import {createApps, exposeTools, registerPageTools, ToolCallError, type Resources, type Inputs, type Outputs, type InputTypes, type OutputTypes} from "holon-ui";
+  const source = `import {apps, view, createApps, exposeTools, registerPageTools, ToolCallError, type Resources, type Inputs, type Outputs, type InputTypes, type OutputTypes} from "holon-ui";
 import type {HostBinding} from "holon-ui/runtime";
 import {z} from "zod";
+view.ontoolresult = ({structuredContent}) => structuredContent;
+(await apps.checkout.tools.get_order({orderId:"own"})).total.toFixed();
+// @ts-expect-error only the app's own server is reachable through the host
+apps.orders;
 await registerPageTools({
   move: {description: "Move", inputSchema: z.object({x: z.number()}), execute: ({x}) => x.toFixed()},
   // @ts-expect-error
@@ -69,7 +75,9 @@ try { await own.checkout.tools.get_order(input); } catch (error) {
   install(join(isolated, "node_modules/holon-ui"), join(repository, "generated"));
   writeFileSync(join(isolated, "check.ts"), `import {createApps} from "holon-ui";\ncreateApps({});\n// @ts-expect-error\ncreateApps({orders: {endpoint: "https://orders.example/mcp"}});`);
   typecheck(join(isolated, "check.ts"), [ts.ModuleResolutionKind.NodeNext]);
-  const { createApps } = await import(pathToFileURL(join(directory, "generated/index.js")));
+  const { createApps, apps: own, view } = await import(pathToFileURL(join(directory, "generated/index.js")));
+  assert.deepEqual(Object.keys(own), ["checkout"]);
+  assert.ok(view instanceof App);
   const apps = createApps({ orders: { endpoint: "https://orders.example/mcp" } });
   assert.deepEqual(Object.keys(apps), ["orders"]);
   assert.equal(await apps.orders.tools, apps.orders.tools);
