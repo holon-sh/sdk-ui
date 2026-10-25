@@ -1,0 +1,53 @@
+{
+  "name": "holon-ui",
+  "version": "0.0.1",
+  "description": "Typed MCP clients for browser views: MCP Apps host bindings and WebMCP tool exposure.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/holon-sh/sdk-ui.git"
+  },
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "holon": {
+    "slot": "generated",
+    "contractVersion": 1
+  },
+  "exports": {
+    ".": {
+      "types": "./generated/index.d.ts",
+      "import": "./generated/index.js"
+    },
+    "./runtime": {
+      "types": "./runtime.d.ts",
+      "import": "./runtime.mjs"
+    }
+  },
+  "files": [
+    "runtime.mjs",
+    "runtime.d.ts",
+    "generated/",
+    "postinstall.mjs",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "postinstall": "node postinstall.mjs",
+    "prepack": "npm run build",
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "fixtures": "node scripts/fixtures.mjs"
+  },
+  "dependencies": {
+    "holon-core": "^0.0.1-dev.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/node": "2.1.1",
+    "@modelcontextprotocol/server": "2.3.1",
+    "@types/node": "^22.0.0",
+    "typescript": "~5.9.3",
+    "zod": "4.6.5"
+  }
+}

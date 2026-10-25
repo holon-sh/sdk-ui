@@ -1,0 +1,69 @@
+name: Publish dev release
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Release channel (only "dev" is supported)
+        type: string
+        default: dev
+permissions:
+  contents: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      VERSION: 0.0.1-dev.${{ github.run_number }}
+    steps:
+      - name: Validate channel
+        env:
+          CHANNEL: ${{ inputs.channel }}
+        run: |
+          if [ "$CHANNEL" != dev ]; then
+            echo "::error::Unsupported channel '$CHANNEL'; only 'dev' can be published from this workflow."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      # Same holon-core bootstrap as ci.yml; delete once holon-core is on npm.
+      - uses: actions/checkout@v4
+        with:
+          repository: holon-sh/sdk-ts
+          ref: main
+          path: .sdk-ts
+      - name: Pack holon-core from sdk-ts
+        run: mkdir -p .holon-core && npm pack ./.sdk-ts/packages/core --pack-destination .holon-core
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Update npm for trusted publishing
+        run: npm install -g npm@11
+      - run: npm ci
+        env:
+          HOLON_SKIP_POSTINSTALL: "1"
+      - run: npm test
+      - name: Set the dev version (not committed)
+        run: npm version "$VERSION" --no-git-tag-version
+      - run: npm pack --dry-run
+      - name: Publish to npm under the dev tag
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -n "$NPM_TOKEN" ]; then
+            echo "//registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}" > "$HOME/.npmrc"
+            export NODE_AUTH_TOKEN="$NPM_TOKEN"
+          fi
+          npm publish --tag dev --access public --provenance
+      - name: Summarize
+        run: |
+          {
+            echo "## holon-ui $VERSION (dev)"
+            echo
+            echo '```sh'
+            echo "npm install holon-ui@$VERSION   # depends on holon-core@^0.0.1-dev.0"
+            echo "npm install holon-ui@dev"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

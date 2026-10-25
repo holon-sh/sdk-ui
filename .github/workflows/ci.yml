@@ -1,0 +1,35 @@
+name: CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # holon-core is not on npm yet: package-lock.json resolves it to .holon-core/holon-core-0.0.1.tgz,
+      # packed here from holon-sh/sdk-ts. Once holon-core is published, regenerate the lockfile
+      # against the registry and delete these two steps.
+      - uses: actions/checkout@v4
+        with:
+          repository: holon-sh/sdk-ts
+          ref: main
+          path: .sdk-ts
+      - name: Pack holon-core from sdk-ts
+        run: mkdir -p .holon-core && npm pack ./.sdk-ts/packages/core --pack-destination .holon-core
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        env:
+          HOLON_SKIP_POSTINSTALL: "1"
+      - run: npm test
+      - run: npm pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: holon-ui-*.tgz
