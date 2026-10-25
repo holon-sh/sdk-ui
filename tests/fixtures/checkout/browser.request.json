@@ -1,0 +1,196 @@
+{
+  "target": "browser",
+  "identity": {
+    "name": "checkout",
+    "version": "1"
+  },
+  "requires": {
+    "orders": {
+      "name": "orders",
+      "version": "1"
+    }
+  },
+  "contracts": {
+    "orders": {
+      "tools": [
+        {
+          "name": "get_order",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "orderId": {
+                "$ref": "#/$defs/OrderId"
+              },
+              "count": {
+                "type": "number",
+                "default": 5
+              }
+            },
+            "required": [
+              "orderId"
+            ],
+            "$defs": {
+              "OrderId": {
+                "type": "string"
+              }
+            }
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "$ref": "#/$defs/Total"
+              }
+            },
+            "required": [
+              "total"
+            ],
+            "additionalProperties": false,
+            "$defs": {
+              "Total": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        {
+          "name": "then",
+          "inputSchema": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "toJSON",
+          "inputSchema": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "unknown_output",
+          "inputSchema": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        }
+      ],
+      "resources": [
+        {
+          "uri": "orders://summary",
+          "outputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "total"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ]
+    },
+    "with-hyphen": {
+      "tools": [
+        {
+          "name": "then",
+          "inputSchema": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        }
+      ]
+    },
+    "checkout": {
+      "tools": [
+        {
+          "name": "get_order",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "orderId": {
+                "$ref": "#/$defs/OrderId"
+              },
+              "count": {
+                "type": "number",
+                "default": 5
+              }
+            },
+            "required": [
+              "orderId"
+            ],
+            "$defs": {
+              "OrderId": {
+                "type": "string"
+              }
+            }
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "$ref": "#/$defs/Total"
+              }
+            },
+            "required": [
+              "total"
+            ],
+            "additionalProperties": false,
+            "$defs": {
+              "Total": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        {
+          "name": "then",
+          "inputSchema": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "toJSON",
+          "inputSchema": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        },
+        {
+          "name": "unknown_output",
+          "inputSchema": {
+            "type": "object",
+            "additionalProperties": false
+          }
+        }
+      ],
+      "resources": [
+        {
+          "uri": "orders://summary",
+          "outputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "total"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ]
+    }
+  },
+  "browser_runtime_specifier": "../runtime.mjs",
+  "protocol_specifier": "holon-core/protocol",
+  "entry": "index",
+  "banner": "holon-generated-apps-v1 app=checkout"
+}
