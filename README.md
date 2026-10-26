@@ -12,7 +12,7 @@ In the app's root directory, next to its `server.json`:
 npm install holon-ui@dev
 ```
 
-Declare `holon-ui` in the app root's `package.json` even when the view's sources live in a subdirectory: `holon types generate` writes browser clients into `node_modules/holon-ui/generated/` whenever that `package.json` declares `holon-ui` (and into `holon-sh` as well when it declares both). The package has the same `postinstall` as `holon-sh`; set `HOLON_SKIP_POSTINSTALL=1` to turn it off.
+Declare `holon-ui` in the app root's `package.json` even when the view's sources live in a subdirectory: `holon types generate` writes browser clients into `node_modules/holon-ui/generated/` whenever that `package.json` declares `holon-ui` (and into `holon-sh` as well when it declares both).
 
 ## The generated module
 
@@ -130,7 +130,7 @@ Then serve `dist/index.html` from the server with `appView` from `holon-sh/view`
 ## Develop
 
 ```sh
-HOLON_SKIP_POSTINSTALL=1 npm ci
+npm ci
 npm test
 ```
 

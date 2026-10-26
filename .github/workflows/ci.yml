@@ -25,8 +25,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-        env:
-          HOLON_SKIP_POSTINSTALL: "1"
       - run: npm test
       - run: npm pack
       - uses: actions/upload-artifact@v4

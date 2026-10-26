@@ -30,12 +30,10 @@
     "runtime.mjs",
     "runtime.d.ts",
     "generated/",
-    "postinstall.mjs",
     "README.md"
   ],
   "scripts": {
     "build": "node scripts/build.mjs",
-    "postinstall": "node postinstall.mjs",
     "prepack": "npm run build",
     "test": "npm run build && node --test tests/*.test.mjs",
     "fixtures": "node scripts/fixtures.mjs"

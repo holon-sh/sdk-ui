@@ -42,8 +42,6 @@ jobs:
       - name: Update npm for trusted publishing
         run: npm install -g npm@11
       - run: npm ci
-        env:
-          HOLON_SKIP_POSTINSTALL: "1"
       - run: npm test
       - name: Set the dev version (not committed)
         run: npm version "$VERSION" --no-git-tag-version
