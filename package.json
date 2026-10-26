@@ -52,6 +52,6 @@
     "@modelcontextprotocol/server": "2.3.1",
     "@types/node": "^22.0.0",
     "typescript": "~5.9.3",
-    "zod": "4.6.5"
+    "zod": "4.6.6"
   }
 }
