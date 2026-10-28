@@ -24,6 +24,8 @@ test("endpoint bindings call tools directly and expose them to WebMCP", { timeou
   const summary = z.toJSONSchema(output);
   const contract = { tools: [{ name: "get_order", inputSchema: z.toJSONSchema(input, { io: "input" }), outputSchema: summary }], resources: [{ uri: "orders://summary", outputSchema: summary }, { uri: "orders://broken", outputSchema: summary }] };
   const identity = { name: "chat-web", version: "1", requires: {} };
+  const unbound = createApps({ ...identity, requires: { chat: {} } }, { chat: contract });
+  await assert.rejects(unbound.chat.tools.get_order({ id: "abc" }), { message: "Dependency chat is unavailable. Provide a binding." });
   const direct = createApps(identity, { chat: contract }, { chat: { endpoint } });
   t.after(() => direct.chat.close());
   assert.deepEqual(await direct.chat.tools.get_order({ id: "abc" }), { total: 3 });

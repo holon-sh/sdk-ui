@@ -23,7 +23,7 @@ const dependencies = { orders: contract, "with-hyphen": { tools: [contract.tools
 // A browser view also calls its own server, keyed by the last segment of its server.json name (as the CLI does).
 const request = {
   target: "browser", identity: { name: "checkout", version: "1" }, requires: { orders: { name: "orders", version: "1" } },
-  contracts: { ...dependencies, checkout: contract }, browser_runtime_specifier: "../runtime.mjs", protocol_specifier: "holon-core/protocol",
+  contracts: { ...dependencies, checkout: contract }, browser_runtime_specifier: "../runtime.mjs", protocol_specifier: "holon-sh/protocol",
   entry: "index", own: "checkout", banner: "holon-generated-apps-v1 app=checkout",
 };
 rmSync(directory, { recursive: true, force: true });

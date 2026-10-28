@@ -190,7 +190,7 @@
     }
   },
   "browser_runtime_specifier": "../runtime.mjs",
-  "protocol_specifier": "holon-core/protocol",
+  "protocol_specifier": "holon-sh/protocol",
   "entry": "index",
   "own": "checkout",
   "banner": "holon-generated-apps-v1 app=checkout"
