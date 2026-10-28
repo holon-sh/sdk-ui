@@ -14,23 +14,21 @@ function pack(directory, destination) {
   return JSON.parse(packed.stdout)[0];
 }
 
-test("the packed package installs beside holon-core and its placeholder types resolve", async t => {
+test("the packed package installs with registry dependencies and its placeholder types resolve", async t => {
   const root = temporary(t);
   const info = pack(".", root);
   const paths = info.files.map(file => file.path).sort();
   assert.deepEqual(paths, ["LICENSE", "README.md", "generated/holon-generated.json", "generated/index.d.ts", "generated/index.js", "package.json", "runtime.d.ts", "runtime.mjs"]);
-  // holon-core is packed from the installed copy until it is on npm; its own dependencies come from the npm cache or registry.
-  const core = pack("./node_modules/holon-core", root);
   const consumer = join(root, "consumer");
   mkdirSync(consumer);
-  const dependencies = { "holon-core": `file:${join(root, core.filename)}`, "holon-ui": `file:${join(root, info.filename)}` };
+  const dependencies = { "holon-ui": `file:${join(root, info.filename)}` };
   writeFileSync(join(consumer, "package.json"), JSON.stringify({ type: "module", private: true, dependencies }));
   const installed = spawnSync("npm", ["install", "--no-audit", "--no-fund", "--prefer-offline"], { cwd: consumer, encoding: "utf8" });
   assert.equal(installed.status, 0, installed.stderr);
   const directory = join(consumer, "node_modules/holon-ui");
   const metadata = JSON.parse(readFileSync(join(directory, "package.json"), "utf8"));
   assert.deepEqual(metadata.holon, { slot: "generated", contractVersion: 1 });
-  assert.deepEqual(Object.keys(metadata.dependencies), ["holon-core"]);
+  assert.deepEqual(Object.keys(metadata.dependencies), ["holon-sh"]);
   assert.deepEqual(JSON.parse(readFileSync(join(directory, "generated/holon-generated.json"), "utf8")), { marker: "holon-generated-apps-v1", placeholder: true });
   const placeholder = await import(pathToFileURL(join(directory, "generated/index.js")));
   assert.deepEqual(Object.keys(placeholder.createApps({})), []);

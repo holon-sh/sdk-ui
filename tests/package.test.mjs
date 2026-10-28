@@ -10,11 +10,11 @@ import { fixture, temporary, typecheck } from "./helpers.mjs";
 const repository = dirname(dirname(fileURLToPath(import.meta.url)));
 
 // Install the holon-ui layout with either the CLI-compiled fixture or the built empty slot,
-// next to the repository's installed holon-core.
+// next to the repository's installed holon-sh.
 function install(directory, generated) {
   cpSync(generated, join(directory, "generated"), { recursive: true });
   for (const name of ["runtime.mjs", "runtime.d.ts", "package.json"]) copyFileSync(join(repository, name), join(directory, name));
-  symlinkSync(realpathSync(join(repository, "node_modules/holon-core")), join(dirname(directory), "holon-core"));
+  symlinkSync(realpathSync(join(repository, "node_modules/holon-sh")), join(dirname(directory), "holon-sh"));
   symlinkSync(realpathSync(join(repository, "node_modules/@modelcontextprotocol")), join(dirname(directory), "@modelcontextprotocol"));
 }
 

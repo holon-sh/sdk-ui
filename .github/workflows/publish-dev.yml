@@ -27,14 +27,6 @@ jobs:
             exit 1
           fi
       - uses: actions/checkout@v4
-      # Same holon-core bootstrap as ci.yml; delete once holon-core is on npm.
-      - uses: actions/checkout@v4
-        with:
-          repository: holon-sh/sdk-ts
-          ref: main
-          path: .sdk-ts
-      - name: Pack holon-core from sdk-ts
-        run: mkdir -p .holon-core && npm pack ./.sdk-ts/packages/core --pack-destination .holon-core
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -61,7 +53,7 @@ jobs:
             echo "## holon-ui $VERSION (dev)"
             echo
             echo '```sh'
-            echo "npm install holon-ui@$VERSION   # depends on holon-core@^0.0.1-dev.0"
+            echo "npm install holon-ui@$VERSION"
             echo "npm install holon-ui@dev"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

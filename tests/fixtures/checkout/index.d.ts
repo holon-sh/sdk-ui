@@ -1,7 +1,7 @@
 // holon-generated-apps-v1 app=checkout
 import type { Outputs as Resources } from "./resources.js";
-import type { AuthProvider, CallOptions, CallMetadata, ToolResult, ToolClient } from "holon-core/protocol";
-export { ToolCallError } from "holon-core/protocol";
+import type { AuthProvider, CallOptions, CallMetadata, ToolResult, ToolClient } from "holon-sh/protocol";
+export { ToolCallError } from "holon-sh/protocol";
 export type { Resources };
 export interface Inputs {
   "checkout": {
