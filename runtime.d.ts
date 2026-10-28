@@ -1,7 +1,6 @@
 import type { App } from "@modelcontextprotocol/ext-apps";
 import type { Binding as EndpointBinding, Identity, Contract, RuntimeClient } from "holon-sh/runtime";
-export type { Binding as EndpointBinding, Identity, Contract, RuntimeClient } from "holon-sh/runtime";
-export type { AuthProvider, CallOptions, CallMetadata, ToolResult, ToolClient } from "holon-sh/runtime";
+export type { Binding as EndpointBinding, Identity, Contract, RuntimeClient, AuthProvider, CallOptions, CallMetadata, ToolResult, ToolClient } from "holon-sh/runtime";
 export { ToolCallError } from "holon-sh/runtime";
 
 export interface CreateOptions { validator?: (schema: object) => (value: unknown) => boolean }

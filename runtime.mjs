@@ -1,9 +1,7 @@
 import { App } from "@modelcontextprotocol/ext-apps";
 import { createApps as create, bindApps, ToolCallError } from "holon-sh/runtime";
 
-export { ToolCallError };
-
-export { bindApps };
+export { bindApps, ToolCallError };
 
 // Browser clients have no process environment or host-wide default binding.
 export function createApps(identity, contracts, bindings, options) {
