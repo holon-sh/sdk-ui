@@ -222,7 +222,8 @@ try {
         if (context) {
           await context.registerTool({
             name: tool.name,
-            description: tool.description,
+            description: tool.description ?? tool.name!,
+            annotations: tool.annotations,
             inputSchema: tool.inputSchema,
             execute: async (input: object) => ({
               content: [
