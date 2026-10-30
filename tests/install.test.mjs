@@ -18,7 +18,8 @@ test("the packed package installs with registry dependencies and its placeholder
   const root = temporary(t);
   const info = pack(".", root);
   const paths = info.files.map(file => file.path).sort();
-  assert.deepEqual(paths, ["LICENSE", "README.md", "generated/holon-generated.json", "generated/index.d.ts", "generated/index.js", "package.json", "runtime.d.ts", "runtime.mjs"]);
+  for (const path of ["generated/index.js", "runtime.mjs", "app.js", "react.js", "state.js", "build.mjs", "src/browser.tsx", "src/host.ts"]) assert.ok(paths.includes(path), path);
+  assert.ok(paths.every(path => !path.includes("node_modules/")));
   const consumer = join(root, "consumer");
   mkdirSync(consumer);
   const dependencies = { "holon-ui": `file:${join(root, info.filename)}` };
@@ -28,7 +29,7 @@ test("the packed package installs with registry dependencies and its placeholder
   const directory = join(consumer, "node_modules/holon-ui");
   const metadata = JSON.parse(readFileSync(join(directory, "package.json"), "utf8"));
   assert.deepEqual(metadata.holon, { slot: "generated", contractVersion: 1 });
-  assert.deepEqual(Object.keys(metadata.dependencies), ["holon-sh"]);
+  assert.ok(metadata.dependencies["holon-sh"]);
   assert.deepEqual(JSON.parse(readFileSync(join(directory, "generated/holon-generated.json"), "utf8")), { marker: "holon-generated-apps-v1", placeholder: true });
   const placeholder = await import(pathToFileURL(join(directory, "generated/index.js")));
   assert.deepEqual(Object.keys(placeholder.createApps({})), []);

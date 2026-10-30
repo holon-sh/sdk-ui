@@ -24,32 +24,74 @@
     "./runtime": {
       "types": "./runtime.d.ts",
       "import": "./runtime.mjs"
+    },
+    "./app": {
+      "types": "./app.d.ts",
+      "import": "./app.js"
+    },
+    "./react": {
+      "types": "./react.d.ts",
+      "import": "./react.js"
+    },
+    "./build": {
+      "types": "./build.d.ts",
+      "import": "./build.mjs"
     }
   },
   "files": [
     "runtime.mjs",
     "runtime.d.ts",
     "generated/",
-    "README.md"
+    "README.md",
+    "app.js",
+    "app.d.ts",
+    "react.js",
+    "react.d.ts",
+    "state.js",
+    "state.d.ts",
+    "build.mjs",
+    "build.d.ts",
+    "src/browser.tsx",
+    "src/host.ts"
   ],
   "scripts": {
     "build": "node scripts/build.mjs",
     "prepack": "npm run build",
     "test": "npm run build && node --test tests/*.test.mjs",
-    "fixtures": "node scripts/fixtures.mjs"
+    "fixtures": "node scripts/fixtures.mjs",
+    "test:browser": "node --test tests/browser/*.test.mjs"
   },
   "dependencies": {
-    "holon-sh": "^0.0.1-dev.2"
+    "@modelcontextprotocol/client": "^2.3.1",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "esbuild": "0.28.2",
+    "holon-sh": "^0.0.1-dev.2",
+    "typescript": "~5.9.3"
   },
   "peerDependencies": {
-    "@modelcontextprotocol/ext-apps": ">=1.0.0"
+    "@modelcontextprotocol/ext-apps": "^2.0.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@modelcontextprotocol/ext-apps": "^1.7.5",
+    "@modelcontextprotocol/ext-apps": "2.0.3",
     "@modelcontextprotocol/node": "2.1.1",
     "@modelcontextprotocol/server": "2.3.1",
     "@types/node": "^22.0.0",
-    "typescript": "~5.9.3",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "playwright": "1.60.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "zod": "4.6.6"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
   }
 }

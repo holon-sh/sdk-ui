@@ -137,3 +137,65 @@ npm test
 ## License
 
 MIT
+
+## One presentation for web and MCP Apps
+
+Generate the app's contracts with `holon types generate`. TypeScript function apps
+and Python `App` decorators produce the same typed references in `holon-ui/app`.
+The browser imports those references, never backend implementations.
+
+```tsx
+// ui/main.tsx
+import { tools, resources } from "holon-ui/app";
+import { view, Form, useResource } from "holon-ui/react";
+
+function Counter() {
+  const state = useResource(resources["counter://state"], { poll: 2000 });
+  return <main>
+    <p>{state.data?.count ?? "Loading…"}</p>
+    {state.error && <p role="alert">{state.error}</p>}
+    <Form action={tools.add} defaults={{ amount: 1 }} />
+  </main>;
+}
+
+export default view(tools.show, Counter);
+```
+
+```ts
+// build.ts; run from the app directory after type generation
+import { build } from "holon-ui/build";
+await build({ entry: "ui/main.tsx", endpoint: "/mcp/counter" });
+```
+
+This emits `dist/web/index.html`, an MCP preview at `dist/web/host.html`,
+`dist/mcp/index.html`, and `dist/views.json` for the server. React and React DOM
+are optional peers; install them when using this presentation API. Existing browser
+clients do not need React. The build compiles JSON Schema validators ahead of time
+so an MCP App does not need `unsafe-eval` or direct network access.
+
+- `view(tool)` generates a form and result display. Pass a React component for a
+  custom UI. The component receives optional `input` and `result` from the host.
+- `Form` accepts typed `bind`, `defaults`, `clear`, and `onSuccess`. Binding every
+  input yields an action button. Native named controls can replace generated fields
+  through `children`. Complex values use JSON textareas. Validation and failed calls
+  preserve the draft; successful calls clear only the requested paths.
+- `useResource` returns `data`, `loading`, `error`, `denied`, and `refresh`. Resource
+  state belongs to the mounted runtime. The web transport subscribes when available;
+  `poll` explicitly enables a fallback for hosts without resource events.
+- `useRuntime().call(tool, input)` uses the same validation and invalidation path
+  as forms and optional WebMCP tools. `onResult(tool, listener)` observes successful
+  local calls, useful for recording exact returned IDs. `surface` identifies web
+  versus MCP rendering.
+
+Ordinary React owns local state, tables, routing, custom controls, and rendering.
+For a custom transport or authentication lifecycle, mount a new `RuntimeContext`
+with a `Runtime` and dispose the previous instance; never share a runtime between
+users. Server-side authorization remains authoritative. Host results update the
+view without replaying mutations. Only an explicitly read-only, zero-required-input
+entry tool runs automatically on the web surface. `webMCP: true` opts into browser
+tool exposure when the browser supplies that API.
+
+The compiler accepts a static `export default view(tools.operation, Component?)`
+declaration. TypeScript/JSON metadata is not a layout language: use React for richer
+presentations. Native MCP APIs remain available for tools and resources that need
+features outside these helpers.

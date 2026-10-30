@@ -1,3 +1,10 @@
 /generated/
 node_modules/
 *.tgz
+
+/app.js
+/app.d.ts
+/react.js
+/react.d.ts
+/state.js
+/state.d.ts
