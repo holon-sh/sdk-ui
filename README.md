@@ -136,4 +136,4 @@ npm test
 
 ## License
 
-MIT
+[Apache License 2.0](LICENSE)
