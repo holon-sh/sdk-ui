@@ -6,7 +6,7 @@
     "type": "git",
     "url": "git+https://github.com/holon-sh/sdk-ui.git"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
   "publishConfig": {
