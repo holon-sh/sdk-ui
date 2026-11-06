@@ -4,6 +4,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { App } from "@modelcontextprotocol/ext-apps";
 import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
+import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createApps, bindApps, appClass, exposeTools, registerPageTools } from "holon-ui/runtime";
 import { serve } from "./helpers.mjs";
@@ -47,18 +48,25 @@ test("endpoint bindings call tools directly and expose them to WebMCP", { timeou
 
 });
 
-test("exposeTools skips app-only tools and keeps tools without visibility", async t => {
+test("exposeTools registers only the tools the server makes visible to the model", { timeout: 10000 }, async t => {
+  const { endpoint } = await serve(t, () => {
+    const server = new McpServer({ name: "orders", version: "1" });
+    const inputSchema = z.object({});
+    const register = (name, ui) => registerAppTool(server, name, { inputSchema, _meta: { ui } }, async () => ({ content: [] }));
+    server.registerTool("lookup", { inputSchema }, async () => ({ content: [] }));
+    register("both", { visibility: ["model", "app"] });
+    register("model_only", { visibility: ["model"] });
+    register("view_only", { visibility: ["app"] });
+    register("nobody", { visibility: [] });
+    return server;
+  });
   const registered = [];
   globalThis.document = { modelContext: { registerTool: async tool => { registered.push(tool.name); } } };
   t.after(() => { delete globalThis.document; });
-  const tools = [
-    { name: "lookup" },
-    { name: "model_only", _meta: { ui: { visibility: ["model"] } } },
-    { name: "view_only", _meta: { ui: { visibility: ["app"] } } },
-    { name: "hidden", _meta: { ui: { visibility: [] } } },
-  ].map(tool => ({ inputSchema: { type: "object" }, ...tool }));
-  await exposeTools({ listTools: async () => ({ tools }) });
-  assert.deepEqual(registered, ["lookup", "model_only"]);
+  const apps = bindApps({ name: "checkout", version: "1", requires: {} }, { orders: { tools: [] } }, { orders: { endpoint } });
+  t.after(() => apps.orders.close());
+  await exposeTools(apps.orders);
+  assert.deepEqual(registered.sort(), ["both", "lookup", "model_only"]);
 });
 
 test("the App class calls the app's own tools and resources through a real MCP Apps host", async t => {
