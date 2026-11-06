@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { McpServer } from "@modelcontextprotocol/server";
+import { inputRequired, McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { App } from "@modelcontextprotocol/ext-apps";
 import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
@@ -64,6 +64,26 @@ test("exposeTools registers only the tools visible to the model", { timeout: 100
   t.after(() => apps.orders.close());
   await exposeTools(apps.orders);
   assert.deepEqual(registered, ["unspecified", "both"]);
+});
+
+test("exposeTools tells the agent about a question it cannot answer", { timeout: 10000 }, async t => {
+  const { endpoint } = await serve(t, () => {
+    const server = new McpServer({ name: "orders", version: "1" });
+    server.registerTool("ship", {}, async () => inputRequired({ inputRequests: {
+      size: inputRequired.elicit({ message: "Which size should I ship?", requestedSchema: z.object({ size: z.string() }) }),
+    } }));
+    return server;
+  });
+  const registered = [];
+  globalThis.document = { modelContext: { registerTool: async tool => { registered.push(tool); } } };
+  t.after(() => { delete globalThis.document; });
+  const apps = createApps({ name: "checkout", version: "1", requires: {} }, { orders: null }, { orders: { endpoint, capabilities: { elicitation: { form: {} } } } });
+  t.after(() => apps.orders.close());
+  await exposeTools(apps.orders);
+  assert.deepEqual(await registered[0].execute({}), {
+    isError: true,
+    content: [{ type: "text", text: "ship needs input this page cannot provide: Which size should I ship?" }],
+  });
 });
 
 test("the App class calls the app's own tools and resources through a real MCP Apps host", async t => {
