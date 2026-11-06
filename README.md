@@ -25,7 +25,7 @@ import { App, ToolCallError, createApps, exposeTools, registerPageTools, type In
 | `App` | The `App` from `@modelcontextprotocol/ext-apps` with your own server's `tools`, `resources` and `callTool` typed. Calls go through the host that embeds the page. |
 | `createApps(bindings, options?)` | Clients for servers you reach by endpoint, keyed like `bindings`. |
 | `ToolCallError` | Thrown by `tools.<tool>` when a tool reports an error or asks for more input. |
-| `exposeTools(client, options?)` | Registers a client's tools with the page's WebMCP agent. |
+| `exposeTools(client, options?)` | Registers a client's model-visible tools with the page's WebMCP agent. |
 | `registerPageTools(tools, options?)` | Registers tools implemented by the page itself. |
 | `Inputs`, `Outputs`, `Resources` | Argument, result and resource value types, as `Inputs["dep"]["tool"]`. |
 
@@ -77,7 +77,7 @@ await apps.orders.resources["orders://summary"].watch(value => render(value.open
 
 ## Give tools to the page's agent
 
-`exposeTools` registers every tool of an endpoint-bound client with the page's WebMCP context (`navigator.modelContext`). Calls from the agent go through the client, so they are validated. It returns `false` when the browser has no WebMCP context.
+`exposeTools` registers the tools of an endpoint-bound client with the page's WebMCP context (`navigator.modelContext`), skipping tools whose `_meta.ui.visibility` omits `"model"` (app-only tools). Calls from the agent go through the client, so they are validated. It returns `false` when the browser has no WebMCP context.
 
 ```typescript
 await exposeTools(apps.orders, { signal: lifetime.signal });

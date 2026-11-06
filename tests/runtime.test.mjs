@@ -47,6 +47,20 @@ test("endpoint bindings call tools directly and expose them to WebMCP", { timeou
 
 });
 
+test("exposeTools skips app-only tools and keeps tools without visibility", async t => {
+  const registered = [];
+  globalThis.document = { modelContext: { registerTool: async tool => { registered.push(tool.name); } } };
+  t.after(() => { delete globalThis.document; });
+  const tools = [
+    { name: "lookup" },
+    { name: "model_only", _meta: { ui: { visibility: ["model"] } } },
+    { name: "view_only", _meta: { ui: { visibility: ["app"] } } },
+    { name: "hidden", _meta: { ui: { visibility: [] } } },
+  ].map(tool => ({ inputSchema: { type: "object" }, ...tool }));
+  await exposeTools({ listTools: async () => ({ tools }) });
+  assert.deepEqual(registered, ["lookup", "model_only"]);
+});
+
 test("the App class calls the app's own tools and resources through a real MCP Apps host", async t => {
   const input = z.strictObject({ id: z.string() });
   const summary = z.toJSONSchema(z.object({ total: z.number() }));

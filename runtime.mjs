@@ -34,6 +34,8 @@ export async function exposeTools(app, options = {}) {
   const execute = options.execute ?? ((name, args) => app.callTool({ name, arguments: args }, { signal }));
   const { tools } = await app.listTools({ signal });
   for (const tool of tools) {
+    // MCP Apps: absent visibility means ["model", "app"]; app-only tools are for the view, not the agent.
+    if (!(tool._meta?.ui?.visibility ?? ["model"]).includes("model")) continue;
     await context.registerTool({
       name: tool.name, title: tool.title, description: tool.description ?? "", inputSchema: tool.inputSchema, annotations: tool.annotations,
       execute: args => execute(tool.name, args ?? {}),
