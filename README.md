@@ -62,6 +62,17 @@ const order = await apps.orders.tools.lookup({ id: "A-1" }, { timeout: 5000 });
 
 An endpoint binding takes `endpoint`, and optionally `authProvider`, `fetch`, and `scoped: true` to close the session after every call. Otherwise a client keeps one session open; call `close()` when the page no longer needs it.
 
+A tool can stop and ask for input through an MCP elicitation. Bind `elicit` to answer it, and the call returns its usual typed output:
+
+```typescript
+const apps = createApps({
+  orders: {
+    endpoint: "https://orders.example.com/mcp",
+    elicit: async ({ params }) => ({ action: "accept", content: await showForm(params) }),
+  },
+});
+```
+
 ## Read and watch resources
 
 A server types a JSON resource by registering it with `mimeType: "application/json"` and an `"sh.holon/outputSchema"` JSON Schema in its `_meta`:
@@ -77,7 +88,7 @@ await apps.orders.resources["orders://summary"].watch(value => render(value.open
 
 ## Give tools to the page's agent
 
-`exposeTools` registers the tools of an endpoint-bound client with the page's WebMCP context (`navigator.modelContext`), except those whose `_meta.ui.visibility` omits `"model"`. Calls from the agent go through the client, so they are validated. It returns `false` when the browser has no WebMCP context.
+`exposeTools` registers the tools of an endpoint-bound client with the page's WebMCP context (`navigator.modelContext`), except those whose `_meta.ui.visibility` omits `"model"`. Calls from the agent go through the client, so they are validated. An agent can only supply arguments, so a question the binding's `elicit` does not answer reaches it as a failed result naming the question. It returns `false` when the browser has no WebMCP context.
 
 ```typescript
 await exposeTools(apps.orders, { signal: lifetime.signal });
