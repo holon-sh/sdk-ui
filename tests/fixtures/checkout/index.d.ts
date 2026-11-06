@@ -1,6 +1,6 @@
 // holon-generated-apps-v1 app=checkout
 import type { Outputs as Resources } from "./resources.js";
-import type { AuthProvider, ClientCapabilities, ElicitHandler, CallOptions, CallMetadata, ToolResult, ToolClient } from "holon-sh/protocol";
+import type { AuthProvider, CallOptions, CallMetadata, ToolResult, ToolClient } from "holon-sh/protocol";
 export { ToolCallError } from "holon-sh/protocol";
 export type { Resources };
 export interface Inputs {
@@ -67,7 +67,7 @@ export interface OutputTypes {
 }
 
 export type Apps = { readonly [A in keyof Inputs]: ToolClient<Inputs[A], Outputs[A], Resources[A]> };
-export interface EndpointBinding { endpoint: URL | string; authProvider?: AuthProvider; fetch?: (input: never, init?: never) => Promise<unknown>; installationUID?: string; scoped?: boolean; capabilities?: ClientCapabilities; elicit?: ElicitHandler }
+export interface EndpointBinding { endpoint: URL | string; authProvider?: AuthProvider; fetch?: (input: never, init?: never) => Promise<unknown>; installationUID?: string; scoped?: boolean }
 export interface CreateOptions { validator?: (schema: object) => (value: unknown) => boolean }
 export declare function createApps<K extends keyof Apps>(bindings: { [A in K]: EndpointBinding }, options?: CreateOptions): Pick<Apps,K>;
 export interface ExposeOptions { signal?: AbortSignal; execute?: (name: string, args: Record<string, unknown>) => Promise<unknown> }
