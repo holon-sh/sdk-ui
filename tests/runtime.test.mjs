@@ -86,6 +86,26 @@ test("exposeTools tells the agent about a question it cannot answer", { timeout:
   });
 });
 
+test("a binding's elicit answers before the agent sees a result", { timeout: 10000 }, async t => {
+  const { endpoint } = await serve(t, () => {
+    const server = new McpServer({ name: "orders", version: "1" });
+    server.registerTool("ship", { inputSchema: z.object({}) }, async (_args, ctx) => {
+      const size = ctx.mcpReq.inputResponses?.size;
+      if (!size) return inputRequired({ inputRequests: { size: inputRequired.elicit({ message: "Which size should I ship?", requestedSchema: z.object({ size: z.string() }) }) } });
+      return { content: [{ type: "text", text: size.content.size }] };
+    });
+    return server;
+  });
+  const registered = [];
+  globalThis.document = { modelContext: { registerTool: async tool => { registered.push(tool); } } };
+  t.after(() => { delete globalThis.document; });
+  const apps = createApps({ name: "checkout", version: "1", requires: {} }, { orders: null }, { orders: { endpoint, elicit: () => ({ action: "accept", content: { size: "large" } }) } });
+  t.after(() => apps.orders.close());
+  await exposeTools(apps.orders);
+  const { content } = await registered[0].execute({});
+  assert.deepEqual(content, [{ type: "text", text: "large" }]);
+});
+
 test("the App class calls the app's own tools and resources through a real MCP Apps host", async t => {
   const input = z.strictObject({ id: z.string() });
   const summary = z.toJSONSchema(z.object({ total: z.number() }));
