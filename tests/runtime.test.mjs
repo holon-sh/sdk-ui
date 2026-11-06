@@ -77,33 +77,10 @@ test("exposeTools tells the agent about a question it cannot answer", { timeout:
   const registered = [];
   globalThis.document = { modelContext: { registerTool: async tool => { registered.push(tool); } } };
   t.after(() => { delete globalThis.document; });
-  const apps = createApps({ name: "checkout", version: "1", requires: {} }, { orders: null }, { orders: { endpoint, capabilities: { elicitation: { form: {} } } } });
+  const apps = createApps({ name: "checkout", version: "1", requires: {} }, { orders: null }, { orders: { endpoint } });
   t.after(() => apps.orders.close());
   await exposeTools(apps.orders);
-  assert.deepEqual(await registered[0].execute({}), {
-    isError: true,
-    content: [{ type: "text", text: "ship needs input this page cannot provide: Which size should I ship?" }],
-  });
-});
-
-test("a binding's elicit answers before the agent sees a result", { timeout: 10000 }, async t => {
-  const { endpoint } = await serve(t, () => {
-    const server = new McpServer({ name: "orders", version: "1" });
-    server.registerTool("ship", { inputSchema: z.object({}) }, async (_args, ctx) => {
-      const size = ctx.mcpReq.inputResponses?.size;
-      if (!size) return inputRequired({ inputRequests: { size: inputRequired.elicit({ message: "Which size should I ship?", requestedSchema: z.object({ size: z.string() }) }) } });
-      return { content: [{ type: "text", text: size.content.size }] };
-    });
-    return server;
-  });
-  const registered = [];
-  globalThis.document = { modelContext: { registerTool: async tool => { registered.push(tool); } } };
-  t.after(() => { delete globalThis.document; });
-  const apps = createApps({ name: "checkout", version: "1", requires: {} }, { orders: null }, { orders: { endpoint, elicit: () => ({ action: "accept", content: { size: "large" } }) } });
-  t.after(() => apps.orders.close());
-  await exposeTools(apps.orders);
-  const { content } = await registered[0].execute({});
-  assert.deepEqual(content, [{ type: "text", text: "large" }]);
+  await assert.rejects(registered[0].execute({}), { name: "ToolCallError", message: "page.ship: additional input required: Which size should I ship?" });
 });
 
 test("the App class calls the app's own tools and resources through a real MCP Apps host", async t => {

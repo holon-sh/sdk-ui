@@ -33,10 +33,9 @@ export async function exposeTools(app, options = {}) {
   const { signal } = options;
   const execute = options.execute ?? (async (name, args) => {
     const result = await app.callTool({ name, arguments: args }, { signal });
-    if (result.resultType !== "input_required") return result;
-    // An agent can only supply arguments, so a question it receives would end the call anyway. Bind elicit to answer it.
-    const questions = Object.values(result.inputRequests ?? {}).flatMap(request => request.params?.message ?? []);
-    return { isError: true, content: [{ type: "text", text: [`${name} needs input this page cannot provide`, ...questions].join(": ") }] };
+    // An agent can only supply arguments, so it cannot answer. A custom execute can.
+    if (result.resultType === "input_required") throw new ToolCallError("page", name, result);
+    return result;
   });
   const { tools } = await app.listTools({ signal });
   for (const tool of tools) {
