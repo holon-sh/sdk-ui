@@ -34,9 +34,7 @@ export async function exposeTools(app, options = {}) {
   const execute = options.execute ?? ((name, args) => app.callTool({ name, arguments: args }, { signal }));
   const { tools } = await app.listTools({ signal });
   for (const tool of tools) {
-    // MCP Apps tool visibility: "model" tools are callable by the agent, "app" tools only by the view,
-    // and absent visibility means ["model", "app"]. This is the spec's own rule; the app-bridge helper
-    // isToolVisibilityAppOnly is narrower and would expose a tool whose visibility is [].
+    // MCP Apps: a tool whose visibility omits "model" must not reach the agent; absent means ["model", "app"].
     // https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx#resource-discovery
     if (!(tool._meta?.ui?.visibility ?? ["model"]).includes("model")) continue;
     await context.registerTool({

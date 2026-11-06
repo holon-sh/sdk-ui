@@ -48,16 +48,13 @@ test("endpoint bindings call tools directly and expose them to WebMCP", { timeou
 
 });
 
-test("exposeTools registers only the tools the server makes visible to the model", { timeout: 10000 }, async t => {
+test("exposeTools registers only the tools visible to the model", { timeout: 10000 }, async t => {
   const { endpoint } = await serve(t, () => {
     const server = new McpServer({ name: "orders", version: "1" });
-    const inputSchema = z.object({});
-    const register = (name, ui) => registerAppTool(server, name, { inputSchema, _meta: { ui } }, async () => ({ content: [] }));
-    server.registerTool("lookup", { inputSchema }, async () => ({ content: [] }));
-    register("both", { visibility: ["model", "app"] });
-    register("model_only", { visibility: ["model"] });
-    register("view_only", { visibility: ["app"] });
-    register("nobody", { visibility: [] });
+    server.registerTool("unspecified", {}, async () => ({ content: [] }));
+    for (const [name, visibility] of [["both", ["model", "app"]], ["view_only", ["app"]], ["nobody", []]]) {
+      registerAppTool(server, name, { _meta: { ui: { visibility } } }, async () => ({ content: [] }));
+    }
     return server;
   });
   const registered = [];
@@ -66,7 +63,7 @@ test("exposeTools registers only the tools the server makes visible to the model
   const apps = bindApps({ name: "checkout", version: "1", requires: {} }, { orders: { tools: [] } }, { orders: { endpoint } });
   t.after(() => apps.orders.close());
   await exposeTools(apps.orders);
-  assert.deepEqual(registered.sort(), ["both", "lookup", "model_only"]);
+  assert.deepEqual(registered, ["unspecified", "both"]);
 });
 
 test("the App class calls the app's own tools and resources through a real MCP Apps host", async t => {
