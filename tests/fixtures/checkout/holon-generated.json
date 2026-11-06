@@ -1,0 +1,8 @@
+{
+  "marker": "holon-generated-apps-v1",
+  "app": "checkout",
+  "identity": {
+    "name": "example.com/checkout",
+    "version": "1"
+  }
+}

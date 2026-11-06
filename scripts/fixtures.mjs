@@ -1,33 +1,27 @@
-// Regenerates tests/fixtures/checkout with the holon CLI's compiler:
-//   HOLON=/path/to/holon npm run fixtures   (default: `holon` on PATH; install with `uv tool install --prerelease allow holon-types`)
-// The request mirrors the slot the CLI writes into node_modules/holon-ui/generated/, and the
-// contracts match holon-sh/sdk-ts's fixtures (packages/node/scripts/fixtures.mjs).
+// The only fixture refresh path: HOLON=/path/to/holon npm run fixtures.
+// Uses public generation in a temporary browser project; no network is needed.
+// The project's own server shares the orders contract, so the slot also has its App class.
+// The project sits inside the repository so that every server loads the repository's MCP SDK.
 import { execFileSync } from "node:child_process";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { copyFileSync, cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { z } from "zod";
 
-const holon = process.env.HOLON || "holon";
+const holon = process.env.HOLON ? resolve(process.env.HOLON) : "holon";
 const directory = fileURLToPath(new URL("../tests/fixtures/checkout/", import.meta.url));
-const contract = { tools: [
-  { name: "get_order",
-    inputSchema: { type: "object", properties: { orderId: { $ref: "#/$defs/OrderId" }, count: { type: "number", default: 5 } }, required: ["orderId"], $defs: { OrderId: { type: "string" } } },
-    outputSchema: { type: "object", properties: { total: { $ref: "#/$defs/Total" } }, required: ["total"], additionalProperties: false, $defs: { Total: { type: "number" } } },
-  },
-  { name: "then", inputSchema: { type: "object", additionalProperties: false } },
-  { name: "toJSON", inputSchema: { type: "object", additionalProperties: false } },
-  { name: "unknown_output", inputSchema: { type: "object", additionalProperties: false } },
-], resources: [{ uri: "orders://summary", outputSchema: z.toJSONSchema(z.object({ total: z.number() })) }] };
-const dependencies = { orders: contract, "with-hyphen": { tools: [contract.tools[1]] } };
-// A browser view also calls its own server, keyed by the last segment of its server.json name (as the CLI does).
-const request = {
-  target: "browser", identity: { name: "checkout", version: "1" }, requires: { orders: { name: "orders", version: "1" } },
-  contracts: { ...dependencies, checkout: contract }, browser_runtime_specifier: "../runtime.mjs", protocol_specifier: "holon-sh/protocol",
-  entry: "index", own: "checkout", banner: "holon-generated-apps-v1 app=checkout",
-};
-rmSync(directory, { recursive: true, force: true });
-mkdirSync(directory, { recursive: true });
-const input = JSON.stringify(request, null, 2) + "\n";
-writeFileSync(join(directory, "browser.request.json"), input);
-execFileSync(holon, ["types", "compile", "--out", directory], { input, stdio: ["pipe", "inherit", "inherit"] });
+const orders = fileURLToPath(new URL("../tests/fixtures/orders/", import.meta.url));
+const temporary = mkdtempSync(fileURLToPath(new URL("../.holon-fixtures-", import.meta.url)));
+try {
+  const consumer = join(temporary, "checkout");
+  const runtime = join(consumer, "node_modules/holon-ui");
+  mkdirSync(runtime, { recursive: true });
+  copyFileSync(new URL("../package.json", import.meta.url), join(runtime, "package.json"));
+  writeFileSync(join(consumer, "package.json"), JSON.stringify({ type: "module", dependencies: { "holon-ui": "*" } }));
+  copyFileSync(join(orders, "server.js"), join(consumer, "server.js"));
+  writeFileSync(join(consumer, "server.json"), JSON.stringify({ name: "example.com/checkout", version: "1", description: "Checkout" }));
+  execFileSync(holon, ["types", "generate", "-s", "./server.js", "-s", `orders=${orders}`, "-s", `with-hyphen=${orders}`], { cwd: consumer, stdio: "inherit" });
+  rmSync(directory, { recursive: true, force: true });
+  cpSync(join(runtime, "generated"), directory, { recursive: true });
+} finally {
+  rmSync(temporary, { recursive: true, force: true });
+}
