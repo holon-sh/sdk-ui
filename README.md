@@ -77,7 +77,7 @@ await apps.orders.resources["orders://summary"].watch(value => render(value.open
 
 ## Give tools to the page's agent
 
-`exposeTools` registers every tool of an endpoint-bound client with the page's WebMCP context (`navigator.modelContext`). Calls from the agent go through the client, so they are validated. It returns `false` when the browser has no WebMCP context.
+`exposeTools` registers the tools of an endpoint-bound client with the page's WebMCP context (`navigator.modelContext`), except those whose `_meta.ui.visibility` omits `"model"`. Calls from the agent go through the client, so they are validated. It returns `false` when the browser has no WebMCP context.
 
 ```typescript
 await exposeTools(apps.orders, { signal: lifetime.signal });

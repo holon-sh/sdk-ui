@@ -4,6 +4,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { App } from "@modelcontextprotocol/ext-apps";
 import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
+import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createApps, bindApps, appClass, exposeTools, registerPageTools } from "holon-ui/runtime";
 import { serve } from "./helpers.mjs";
@@ -45,6 +46,24 @@ test("endpoint bindings call tools directly and expose them to WebMCP", { timeou
   assert.equal(await registered[1].tool.execute({ id: "z" }), "custom");
   assert.deepEqual(custom, [["get_order", { id: "z" }]]);
 
+});
+
+test("exposeTools registers only the tools visible to the model", { timeout: 10000 }, async t => {
+  const { endpoint } = await serve(t, () => {
+    const server = new McpServer({ name: "orders", version: "1" });
+    server.registerTool("unspecified", {}, async () => ({ content: [] }));
+    for (const [name, visibility] of [["both", ["model", "app"]], ["view_only", ["app"]], ["nobody", []]]) {
+      registerAppTool(server, name, { _meta: { ui: { visibility } } }, async () => ({ content: [] }));
+    }
+    return server;
+  });
+  const registered = [];
+  globalThis.document = { modelContext: { registerTool: async tool => { registered.push(tool.name); } } };
+  t.after(() => { delete globalThis.document; });
+  const apps = bindApps({ name: "checkout", version: "1", requires: {} }, { orders: { tools: [] } }, { orders: { endpoint } });
+  t.after(() => apps.orders.close());
+  await exposeTools(apps.orders);
+  assert.deepEqual(registered, ["unspecified", "both"]);
 });
 
 test("the App class calls the app's own tools and resources through a real MCP Apps host", async t => {
