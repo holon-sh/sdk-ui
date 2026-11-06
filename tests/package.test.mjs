@@ -71,7 +71,7 @@ const wrongId: InputTypes["orders"]["get_order"]["OrderId"] = total;
 const input: Inputs["checkout"]["get_order"] = {orderId};
 const output: Outputs["checkout"]["get_order"] = {total};
 try { await view.tools.get_order(input); } catch (error) {
-  if (error instanceof ToolCallError) error.code.toUpperCase();
+  if (error instanceof ToolCallError) error.result.resultType.toUpperCase();
 }
 `;
   writeFileSync(join(root, "check.ts"), source);
