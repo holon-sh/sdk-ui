@@ -1,40 +1,37 @@
 // holon-generated-apps-v1 app=checkout
 import type { Outputs as Resources } from "./resources.js";
-import type { AuthProvider, CallOptions, CallMetadata, ToolResult, ToolClient } from "holon-sh/protocol";
+import type { AuthProvider, ClientCapabilities, ElicitHandler, CallOptions, CallMetadata, ToolResult, ToolClient } from "holon-sh/protocol";
 export { ToolCallError } from "holon-sh/protocol";
 export type { Resources };
 export interface Inputs {
   "checkout": {
-    "get_order": { "count"?: number; "orderId": string; [key: string]: unknown; };
+    "get_order": { "count"?: number; "orderId": string; };
     "then": {  };
     "toJSON": {  };
     "unknown_output": {  };
   };
   "orders": {
-    "get_order": { "count"?: number; "orderId": string; [key: string]: unknown; };
+    "get_order": { "count"?: number; "orderId": string; };
     "then": {  };
     "toJSON": {  };
     "unknown_output": {  };
   };
   "with-hyphen": {
+    "get_order": { "count"?: number; "orderId": string; };
     "then": {  };
+    "toJSON": {  };
+    "unknown_output": {  };
   };
 }
 export interface Outputs {
   "checkout": {
     "get_order": { "total": number; };
-    "then": unknown;
-    "toJSON": unknown;
-    "unknown_output": unknown;
   };
   "orders": {
     "get_order": { "total": number; };
-    "then": unknown;
-    "toJSON": unknown;
-    "unknown_output": unknown;
   };
   "with-hyphen": {
-    "then": unknown;
+    "get_order": { "total": number; };
   };
 }
 export interface InputTypes {
@@ -51,29 +48,26 @@ export interface InputTypes {
     "unknown_output": {  };
   };
   "with-hyphen": {
+    "get_order": { "OrderId": string; };
     "then": {  };
+    "toJSON": {  };
+    "unknown_output": {  };
   };
 }
 export interface OutputTypes {
   "checkout": {
     "get_order": { "Total": number; };
-    "then": {  };
-    "toJSON": {  };
-    "unknown_output": {  };
   };
   "orders": {
     "get_order": { "Total": number; };
-    "then": {  };
-    "toJSON": {  };
-    "unknown_output": {  };
   };
   "with-hyphen": {
-    "then": {  };
+    "get_order": { "Total": number; };
   };
 }
 
 export type Apps = { readonly [A in keyof Inputs]: ToolClient<Inputs[A], Outputs[A], Resources[A]> };
-export interface EndpointBinding { endpoint: URL | string; authProvider?: AuthProvider; fetch?: (input: never, init?: never) => Promise<unknown>; installationUID?: string; scoped?: boolean }
+export interface EndpointBinding { endpoint: URL | string; authProvider?: AuthProvider; fetch?: (input: never, init?: never) => Promise<unknown>; installationUID?: string; scoped?: boolean; capabilities?: ClientCapabilities; elicit?: ElicitHandler }
 export interface CreateOptions { validator?: (schema: object) => (value: unknown) => boolean }
 export declare function createApps<K extends keyof Apps>(bindings: { [A in K]: EndpointBinding }, options?: CreateOptions): Pick<Apps,K>;
 export interface ExposeOptions { signal?: AbortSignal; execute?: (name: string, args: Record<string, unknown>) => Promise<unknown> }
@@ -86,4 +80,5 @@ export interface PageTool<S extends PageSchema = PageSchema> { description: stri
 export interface PageHost { registerTool(name: string, config: { description: string; inputSchema: PageSchema; annotations?: PageAnnotations }, callback: (args: any, extra: any) => any): { remove(): void } }
 export declare function registerPageTools<S extends { [name: string]: PageSchema }>(tools: { [K in keyof S]: PageTool<S[K]> }, options?: { view?: PageHost; signal?: AbortSignal }): Promise<boolean>;
 import { App as HostApp } from "@modelcontextprotocol/ext-apps";
-export declare class App extends HostApp { readonly tools: Apps["checkout"]["tools"]; readonly resources: Apps["checkout"]["resources"]; readonly callTool: Apps["checkout"]["callTool"] }
+type OwnAppKey = "checkout";
+export declare class App extends HostApp { readonly tools: Apps[OwnAppKey]["tools"]; readonly resources: Apps[OwnAppKey]["resources"]; readonly callTool: Apps[OwnAppKey]["callTool"] }
