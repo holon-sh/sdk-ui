@@ -30,10 +30,10 @@ test("the packed package installs with registry dependencies and runs the projec
   assert.deepEqual(Object.keys(metadata.dependencies), ["holon-sh"]);
   // holon writes the clients into the project; nothing is copied into node_modules.
   cpSync(fixture("checkout"), join(consumer, "generated/holon-ui"), { recursive: true });
-  const { createApps } = await import(pathToFileURL(join(consumer, "generated/holon-ui/index.js")));
+  const { createApps } = await import(pathToFileURL(join(consumer, "generated/holon-ui/index.mjs")));
   assert.deepEqual(Object.keys(createApps({ orders: { endpoint: "https://orders.example/mcp" } })), ["orders"]);
   const source = join(consumer, "consumer.ts");
-  writeFileSync(source, `import { createApps, registerPageTools, type Apps } from "./generated/holon-ui/index.js";
+  writeFileSync(source, `import { createApps, registerPageTools, type Apps } from "./generated/holon-ui/index.mjs";
 import type { EndpointBinding } from "holon-ui/runtime";
 const orders: EndpointBinding = { endpoint: "https://orders.example/mcp" };
 const apps: Pick<Apps, "orders"> = createApps({ orders });
@@ -45,7 +45,7 @@ createApps({ missing: orders });
 });
 
 test("the runtime and generated clients are browser modules", () => {
-  for (const file of [join(repository, "runtime.mjs"), join(fixture("checkout"), "index.js")]) {
+  for (const file of [join(repository, "runtime.mjs"), join(fixture("checkout"), "index.mjs")]) {
     assert.doesNotMatch(readFileSync(file, "utf8"), /\bprocess\.|from "node:/, file);
   }
 });

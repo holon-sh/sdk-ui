@@ -17,7 +17,7 @@ Declare `holon-ui` in the app root's `package.json` even when the view's sources
 ## The generated module
 
 ```typescript
-import { App, ToolCallError, createApps, exposeTools, registerPageTools, type Inputs, type Outputs, type Resources } from "../generated/holon-ui/index.js";
+import { App, ToolCallError, createApps, exposeTools, registerPageTools, type Inputs, type Outputs, type Resources } from "../generated/holon-ui/index.mjs";
 ```
 
 | Export | What it is |
@@ -38,7 +38,7 @@ Your own server appears under the last segment of its `server.json` name, e.g. `
 A view embedded in an MCP Apps host calls its own server through the host, which owns the connection and the credentials. Construct and connect `App` exactly as you would the one from `@modelcontextprotocol/ext-apps`; it is that class with typed members added:
 
 ```typescript
-import { App } from "../generated/holon-ui/index.js";
+import { App } from "../generated/holon-ui/index.mjs";
 
 const view = new App({ name: "checkout-view", version: "1.0.0" });
 view.ontoolresult = ({ structuredContent }) => render(structuredContent);

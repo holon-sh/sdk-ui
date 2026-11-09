@@ -24,7 +24,7 @@ test("ordinary NodeNext and Bundler compilation enforces browser bindings, page 
   install(root);
   symlinkSync(realpathSync(join(repository, "node_modules/zod")), join(root, "node_modules/zod"));
   writeFileSync(join(root, "package.json"), '{"type":"module"}');
-  const source = `import {App, createApps, exposeTools, registerPageTools, ToolCallError, type Resources, type Inputs, type Outputs, type InputTypes, type OutputTypes} from "./generated/holon-ui/index.js";
+  const source = `import {App, createApps, exposeTools, registerPageTools, ToolCallError, type Resources, type Inputs, type Outputs, type InputTypes, type OutputTypes} from "./generated/holon-ui/index.mjs";
 import {App as HostApp} from "@modelcontextprotocol/ext-apps";
 import {z} from "zod";
 const view = new App({name: "checkout-view", version: "1.0.0"}, {}, {autoResize: false});
@@ -76,7 +76,7 @@ try { await view.tools.get_order(input); } catch (error) {
 `;
   writeFileSync(join(root, "check.ts"), source);
   typecheck(join(root, "check.ts"));
-  const { createApps, App: View } = await import(pathToFileURL(join(root, "generated/holon-ui/index.js")));
+  const { createApps, App: View } = await import(pathToFileURL(join(root, "generated/holon-ui/index.mjs")));
   const view = new View({ name: "checkout-view", version: "1" });
   assert.ok(view instanceof App);
   assert.equal(typeof view.tools.get_order, "function");
