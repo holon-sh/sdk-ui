@@ -144,6 +144,10 @@ npm ci
 npm test
 ```
 
+## Community
+
+Ask questions and share what you're building on the [Holon Discord](https://holon-labs.dev/discord/).
+
 ## License
 
 [Apache License 2.0](LICENSE)
