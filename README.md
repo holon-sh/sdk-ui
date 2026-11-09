@@ -1,153 +1,69 @@
 # holon-ui
 
-Typed MCP clients for browser pages: views that run inside an MCP Apps host, or standalone pages that talk to MCP servers directly. The [`holon` CLI](https://github.com/holon-sh/cli) generates your app's clients into its `generated/holon-ui/` directory, beside its `package.json`, and maps `#holon-ui` to them there. Clients validate arguments before each call and results after it, and can expose tools to the page's WebMCP agent.
+[![Docs](https://img.shields.io/badge/docs-holon--labs.dev-blue)](https://holon-labs.dev/docs/)
 
-`holon-ui` contains only browser code. Server code uses `holon-sh` ([Node.js](https://github.com/holon-sh/sdk-ts) or [Python](https://github.com/holon-sh/sdk-py)). Start with the [CLI README](https://github.com/holon-sh/cli) for the walkthrough.
+Typed MCP clients for browser pages: MCP App views, and pages that call MCP servers directly.
 
 ## Install
 
-In the app's root directory, next to its `server.json`:
-
 ```sh
 npm install holon-ui@dev
+npm install -D holon-types typescript
 ```
 
-Declare `holon-ui` in the app root's `package.json` even when the view's sources live in a subdirectory: `holon types generate` writes browser clients into `generated/holon-ui/` beside the `package.json` that declares `holon-ui` (and Node clients into `generated/holon-sh/` when it declares `holon-sh` too). The generated module imports `holon-ui/runtime` and, for `App`, `@modelcontextprotocol/ext-apps`, so the app installs both.
+## Create an app
 
-## The generated module
-
-```typescript
-import { App, ToolCallError, createApps, exposeTools, registerPageTools, type Inputs, type Outputs, type Resources } from "#holon-ui";
+```sh
+npx create-holon-app foo
 ```
 
-| Export | What it is |
-|---|---|
-| `App` | The `App` from `@modelcontextprotocol/ext-apps` with your own server's `tools`, `resources` and `callTool` typed. Calls go through the host that embeds the page. |
-| `createApps(bindings, options?)` | Clients for servers you reach by endpoint, keyed like `bindings`. |
-| `ToolCallError` | Thrown by `tools.<tool>` when a tool reports an error or asks for more input. |
-| `exposeTools(client, options?)` | Registers a client's tools with the page's WebMCP agent. |
-| `registerPageTools(tools, options?)` | Registers tools implemented by the page itself. |
-| `Inputs`, `Outputs`, `Resources` | Argument, result and resource value types, as `Inputs["dep"]["tool"]`. |
+This creates an MCP server with a `greet` tool and a view in `ui/main.ts`.
 
-Your own server appears under the last segment of its `server.json` name, e.g. `example.com/checkout` → `checkout`: `Inputs["checkout"]`, `Outputs["checkout"]`, and `createApps({ checkout: { endpoint } })` for a standalone page. Every other key is a dependency declared in `server.json`.
+## Calling your server from a view
 
-## Bind a client
+The server declares the tool's input and output:
 
-### Inside an MCP Apps host
-
-A view embedded in an MCP Apps host calls its own server through the host, which owns the connection and the credentials. Construct and connect `App` exactly as you would the one from `@modelcontextprotocol/ext-apps`; it is that class with typed members added:
-
-```typescript
-import { App } from "#holon-ui";
-
-const view = new App({ name: "checkout-view", version: "1.0.0" });
-view.ontoolresult = ({ structuredContent }) => render(structuredContent);
-await view.connect();
-
-const { total } = await view.tools.total({ id: "A-1" });
-```
-
-The host owns the tool catalog, so `listTools`, `exposeTools` and `watch` need an endpoint binding instead.
-
-### Directly to an endpoint
-
-```typescript
-const apps = createApps({
-  checkout: { endpoint: new URL("/mcp", location.origin) },
-  orders: { endpoint: "https://orders.example.com/mcp" },
-});
-
-const order = await apps.orders.tools.lookup({ id: "A-1" }, { timeout: 5000 });
-```
-
-An endpoint binding takes `endpoint`, and optionally `authProvider`, `fetch`, and `scoped: true` to close the session after every call. Otherwise a client keeps one session open; call `close()` when the page no longer needs it.
-
-A tool can stop and ask for input through an MCP elicitation. Pass `elicit` to answer it, and the call returns its usual typed output:
-
-```typescript
-const { shipped } = await apps.orders.tools.ship({ id: "A-1" }, {
-  elicit: async params => ({ action: "accept", content: await showForm(params) }),
-});
-```
-
-Without `elicit`, the call throws `ToolCallError` with the question on `.result`.
-
-## Read and watch resources
-
-A server types a JSON resource by registering it with `mimeType: "application/json"` and an `"sh.holon/outputSchema"` JSON Schema in its `_meta`:
-
-```typescript
-const summary = await apps.orders.resources["orders://summary"].read();
-
-const lifetime = new AbortController();
-await apps.orders.resources["orders://summary"].watch(value => render(value.open), { signal: lifetime.signal });
-```
-
-`watch` calls back with the current value and then on every update, until the signal aborts; the server must support resource subscriptions.
-
-## Give tools to the page's agent
-
-`exposeTools` registers the tools of an endpoint-bound client with the page's WebMCP context (`navigator.modelContext`), except those whose `_meta.ui.visibility` omits `"model"`. Calls from the agent go through the client, so they are validated. An agent can only supply arguments, so a question reaches it as a failed call naming the question; to answer for it, pass an `execute` that calls `callTool` with `elicit`. It returns `false` when the browser has no WebMCP context.
-
-```typescript
-await exposeTools(apps.orders, { signal: lifetime.signal });
-```
-
-`registerPageTools` registers tools the page implements itself. Input schemas are Standard Schema validators that can produce JSON Schema, such as Zod 4. Pass `view` to register with the MCP Apps host; without it they go to WebMCP. Aborting the signal unregisters them.
-
-```typescript
-import { z } from "zod";
-
-await registerPageTools(
+```ts
+server.registerTool(
+  "greet",
   {
-    highlight: {
-      description: "Highlight an order on the page",
-      inputSchema: z.object({ id: z.string() }),
-      execute: ({ id }) => {
-        select(id);
-        return { content: [{ type: "text", text: `Highlighted ${id}` }] };
-      },
-    },
+    inputSchema: z.strictObject({ name: z.string() }),
+    outputSchema: z.strictObject({ result: z.string() }),
   },
-  { view, signal: lifetime.signal },
+  ({ name }) => {
+    const output = { result: `Hello, ${name}!` };
+    return { content: [{ type: "text", text: output.result }], structuredContent: output };
+  },
 );
 ```
 
-## Build and serve a view
-
-The server serves the view as one HTML file, so bundle it into a single file. With Vite, in the app root:
-
-```typescript
-// vite.config.ts
-import { defineConfig } from "vite";
-import { viteSingleFile } from "vite-plugin-singlefile";
-
-export default defineConfig({ root: "ui", plugins: [viteSingleFile()], build: { outDir: "../dist", emptyOutDir: true } });
-```
+The `App` from `#holon-ui` types the server's tools, so a wrong tool name, argument or result is a type error:
 
 ```sh
-npm install --save-dev vite vite-plugin-singlefile
-npm install @modelcontextprotocol/ext-apps
-npx vite build
+npx holon types check
 ```
 
-Then serve `dist/index.html` from the server as an [MCP App](https://modelcontextprotocol.io/extensions/apps/overview) resource.
+```ts
+import { App } from "#holon-ui";
 
-## Low-level runtime
+const view = new App({ name: "foo", version: "0.1.0" });
+await view.connect();
 
-`holon-ui/runtime` exports what the generated module calls: `createApps(identity, contracts, bindings?, options?)`, `bindApps`, `appClass(identity, contracts, own)`, `exposeTools`, `registerPageTools`, `ToolCallError`, and the `EndpointBinding`, `View` and page-tool types. Apps use the generated module instead.
+const { result } = await view.tools.greet({ name: "Ada" });
 
-## Develop
+await view.tools.great({ name: "Ada" });
+// error TS2551: Property 'great' does not exist on type '{ readonly greet: (input: { name: string; }, options?: ToolCallOptions | undefined) => Promise<{ result: string; }>; }'. Did you mean 'greet'?
 
-```sh
-npm ci
-npm test
+await view.tools.greet({ name: 42 });
+// error TS2322: Type 'number' is not assignable to type 'string'.
+
+await view.tools.greet({});
+// error TS2741: Property '"name"' is missing in type '{}' but required in type '{ name: string; }'.
+
+result.toFixed();
+// error TS2551: Property 'toFixed' does not exist on type 'string'. Did you mean 'fixed'?
 ```
 
 ## Community
 
-Ask questions and share what you're building on the [Holon Discord](https://holon-labs.dev/discord/).
-
-## License
-
-[Apache License 2.0](LICENSE)
+Ask questions and share what you're building on the [Holon Discord](https://discord.gg/jXExyBdy).
