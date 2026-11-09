@@ -131,7 +131,7 @@ npm install @modelcontextprotocol/ext-apps
 npx vite build
 ```
 
-Then serve `dist/index.html` from the server with `appView` from `holon-sh/view` (Node.js) or `app_view` from `holon.view` (Python); both are documented in their runtime READMEs.
+Then serve `dist/index.html` from the server as an [MCP App](https://modelcontextprotocol.io/extensions/apps/overview) resource.
 
 ## Low-level runtime
 
