@@ -22,18 +22,18 @@ test("the packed package installs with registry dependencies and runs the projec
   const consumer = join(root, "consumer");
   mkdirSync(consumer);
   const dependencies = { "holon-ui": `file:${join(root, info.filename)}` };
-  writeFileSync(join(consumer, "package.json"), JSON.stringify({ type: "module", private: true, dependencies }));
+  writeFileSync(join(consumer, "package.json"), JSON.stringify({ type: "module", private: true, imports: { "#holon-ui": "./generated/holon-ui/index.mjs" }, dependencies }));
   const installed = spawnSync("npm", ["install", "--no-audit", "--no-fund", "--prefer-offline"], { cwd: consumer, encoding: "utf8" });
   assert.equal(installed.status, 0, installed.stderr);
   const metadata = JSON.parse(readFileSync(join(consumer, "node_modules/holon-ui/package.json"), "utf8"));
   assert.deepEqual(metadata.holon, { contractVersion: 2 });
   assert.deepEqual(Object.keys(metadata.dependencies), ["holon-sh"]);
-  // holon writes the clients into the project; nothing is copied into node_modules.
+  // holon writes the clients into the project and maps #holon-ui to them; nothing is copied into node_modules.
   cpSync(fixture("checkout"), join(consumer, "generated/holon-ui"), { recursive: true });
   const { createApps } = await import(pathToFileURL(join(consumer, "generated/holon-ui/index.mjs")));
   assert.deepEqual(Object.keys(createApps({ orders: { endpoint: "https://orders.example/mcp" } })), ["orders"]);
   const source = join(consumer, "consumer.ts");
-  writeFileSync(source, `import { createApps, registerPageTools, type Apps } from "./generated/holon-ui/index.mjs";
+  writeFileSync(source, `import { createApps, registerPageTools, type Apps } from "#holon-ui";
 import type { EndpointBinding } from "holon-ui/runtime";
 const orders: EndpointBinding = { endpoint: "https://orders.example/mcp" };
 const apps: Pick<Apps, "orders"> = createApps({ orders });

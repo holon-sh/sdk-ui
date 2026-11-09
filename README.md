@@ -1,6 +1,6 @@
 # holon-ui
 
-Typed MCP clients for browser pages: views that run inside an MCP Apps host, or standalone pages that talk to MCP servers directly. The [`holon` CLI](https://github.com/holon-sh/cli) generates your app's clients into its `generated/holon-ui/` directory, beside its `package.json`. Clients validate arguments before each call and results after it, and can expose tools to the page's WebMCP agent.
+Typed MCP clients for browser pages: views that run inside an MCP Apps host, or standalone pages that talk to MCP servers directly. The [`holon` CLI](https://github.com/holon-sh/cli) generates your app's clients into its `generated/holon-ui/` directory, beside its `package.json`, and maps `#holon-ui` to them there. Clients validate arguments before each call and results after it, and can expose tools to the page's WebMCP agent.
 
 `holon-ui` contains only browser code. Server code uses `holon-sh` ([Node.js](https://github.com/holon-sh/sdk-ts) or [Python](https://github.com/holon-sh/sdk-py)). Start with the [CLI README](https://github.com/holon-sh/cli) for the walkthrough.
 
@@ -17,7 +17,7 @@ Declare `holon-ui` in the app root's `package.json` even when the view's sources
 ## The generated module
 
 ```typescript
-import { App, ToolCallError, createApps, exposeTools, registerPageTools, type Inputs, type Outputs, type Resources } from "../generated/holon-ui/index.mjs";
+import { App, ToolCallError, createApps, exposeTools, registerPageTools, type Inputs, type Outputs, type Resources } from "#holon-ui";
 ```
 
 | Export | What it is |
@@ -38,7 +38,7 @@ Your own server appears under the last segment of its `server.json` name, e.g. `
 A view embedded in an MCP Apps host calls its own server through the host, which owns the connection and the credentials. Construct and connect `App` exactly as you would the one from `@modelcontextprotocol/ext-apps`; it is that class with typed members added:
 
 ```typescript
-import { App } from "../generated/holon-ui/index.mjs";
+import { App } from "#holon-ui";
 
 const view = new App({ name: "checkout-view", version: "1.0.0" });
 view.ontoolresult = ({ structuredContent }) => render(structuredContent);
