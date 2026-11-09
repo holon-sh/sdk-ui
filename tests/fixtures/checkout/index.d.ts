@@ -1,23 +1,27 @@
 // holon-generated-apps-v1 app=checkout
-import type { Outputs as Resources } from "./resources.js";
-import type { AuthProvider, CallOptions, CallMetadata, ToolResult, ToolClient } from "holon-sh/protocol";
-export { ToolCallError } from "holon-sh/protocol";
-export type { Resources };
+import type { ToolClient, EndpointBinding, CreateOptions } from "holon-ui/runtime";
+export { ToolCallError } from "holon-ui/runtime";
+export type CheckoutInputOrderId = string;
+export type CheckoutOutputTotal = number;
+export type OrdersInputOrderId = string;
+export type OrdersOutputTotal = number;
+export type WithHyphenInputOrderId = string;
+export type WithHyphenOutputTotal = number;
 export interface Inputs {
   "checkout": {
-    "get_order": { "count"?: number; "orderId": string; };
+    "get_order": { "count"?: number; "orderId": CheckoutInputOrderId; };
     "then": {  };
     "toJSON": {  };
     "unknown_output": {  };
   };
   "orders": {
-    "get_order": { "count"?: number; "orderId": string; };
+    "get_order": { "count"?: number; "orderId": OrdersInputOrderId; };
     "then": {  };
     "toJSON": {  };
     "unknown_output": {  };
   };
   "with-hyphen": {
-    "get_order": { "count"?: number; "orderId": string; };
+    "get_order": { "count"?: number; "orderId": WithHyphenInputOrderId; };
     "then": {  };
     "toJSON": {  };
     "unknown_output": {  };
@@ -25,30 +29,30 @@ export interface Inputs {
 }
 export interface Outputs {
   "checkout": {
-    "get_order": { "total": number; };
+    "get_order": { "total": CheckoutOutputTotal; };
   };
   "orders": {
-    "get_order": { "total": number; };
+    "get_order": { "total": OrdersOutputTotal; };
   };
   "with-hyphen": {
-    "get_order": { "total": number; };
+    "get_order": { "total": WithHyphenOutputTotal; };
   };
 }
 export interface InputTypes {
   "checkout": {
-    "get_order": { "OrderId": string; };
+    "get_order": { "OrderId": CheckoutInputOrderId; };
     "then": {  };
     "toJSON": {  };
     "unknown_output": {  };
   };
   "orders": {
-    "get_order": { "OrderId": string; };
+    "get_order": { "OrderId": OrdersInputOrderId; };
     "then": {  };
     "toJSON": {  };
     "unknown_output": {  };
   };
   "with-hyphen": {
-    "get_order": { "OrderId": string; };
+    "get_order": { "OrderId": WithHyphenInputOrderId; };
     "then": {  };
     "toJSON": {  };
     "unknown_output": {  };
@@ -56,29 +60,33 @@ export interface InputTypes {
 }
 export interface OutputTypes {
   "checkout": {
-    "get_order": { "Total": number; };
+    "get_order": { "Total": CheckoutOutputTotal; };
   };
   "orders": {
-    "get_order": { "Total": number; };
+    "get_order": { "Total": OrdersOutputTotal; };
   };
   "with-hyphen": {
-    "get_order": { "Total": number; };
+    "get_order": { "Total": WithHyphenOutputTotal; };
+  };
+}
+export interface Resources {
+  "checkout": {
+    "orders://summary": { "total": number; };
+  };
+  "orders": {
+    "orders://summary": { "total": number; };
+  };
+  "with-hyphen": {
+    "orders://summary": { "total": number; };
   };
 }
 
 export type Apps = { readonly [A in keyof Inputs]: ToolClient<Inputs[A], Outputs[A], Resources[A]> };
-export interface EndpointBinding { endpoint: URL | string; authProvider?: AuthProvider; fetch?: (input: never, init?: never) => Promise<unknown>; installationUID?: string; scoped?: boolean }
-export interface CreateOptions { validator?: (schema: object) => (value: unknown) => boolean }
+export type { EndpointBinding, CreateOptions };
 export declare function createApps<K extends keyof Apps>(bindings: { [A in K]: EndpointBinding }, options?: CreateOptions): Pick<Apps,K>;
-export interface ExposeOptions { signal?: AbortSignal; execute?: (name: string, args: Record<string, unknown>) => Promise<unknown> }
-export declare function exposeTools(app: Apps[keyof Apps], options?: ExposeOptions): Promise<boolean>;
-export type PageResult<I> = { readonly value: I; readonly issues?: undefined } | { readonly issues: ReadonlyArray<{ readonly message: string }> };
-export interface PageSchema<I = unknown> { readonly "~standard": { readonly version: 1; readonly vendor: string; readonly types?: { readonly input: unknown; readonly output: I }; readonly validate: (value: unknown) => PageResult<I> | Promise<PageResult<I>>; readonly jsonSchema: { readonly input: (options: { target: "draft-2020-12" }) => object } } }
-export type PageInput<S> = S extends PageSchema<infer I> ? I : never;
-export interface PageAnnotations { title?: string; readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean; openWorldHint?: boolean }
-export interface PageTool<S extends PageSchema = PageSchema> { description: string; inputSchema: S; annotations?: PageAnnotations; execute: (args: PageInput<S>) => unknown }
-export interface PageHost { registerTool(name: string, config: { description: string; inputSchema: PageSchema; annotations?: PageAnnotations }, callback: (args: any, extra: any) => any): { remove(): void } }
-export declare function registerPageTools<S extends { [name: string]: PageSchema }>(tools: { [K in keyof S]: PageTool<S[K]> }, options?: { view?: PageHost; signal?: AbortSignal }): Promise<boolean>;
+export type { ExposeOptions, PageResult, PageSchema, PageInput, PageAnnotations, PageTool, PageHost } from "holon-ui/runtime";
+export { registerPageTools } from "holon-ui/runtime";
+export declare function exposeTools(app: Apps[keyof Apps], options?: import("holon-ui/runtime").ExposeOptions): Promise<boolean>;
 import { App as HostApp } from "@modelcontextprotocol/ext-apps";
 type OwnAppKey = "checkout";
 export declare class App extends HostApp { readonly tools: Apps[OwnAppKey]["tools"]; readonly resources: Apps[OwnAppKey]["resources"]; readonly callTool: Apps[OwnAppKey]["callTool"] }
