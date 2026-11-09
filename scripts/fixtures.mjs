@@ -1,6 +1,6 @@
 // The only fixture refresh path: HOLON=/path/to/holon npm run fixtures.
 // Uses public generation in a temporary browser project; no network is needed.
-// The project's own server shares the orders contract, so the slot also has its App class.
+// The project's own server shares the orders contract, so the clients also have its App class.
 // The project sits inside the repository so that every server loads the repository's MCP SDK.
 import { execFileSync } from "node:child_process";
 import { copyFileSync, cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -21,7 +21,7 @@ try {
   writeFileSync(join(consumer, "server.json"), JSON.stringify({ name: "example.com/checkout", version: "1", description: "Checkout" }));
   execFileSync(holon, ["types", "generate", "-s", "./server.js", "-s", `orders=${orders}`, "-s", `with-hyphen=${orders}`], { cwd: consumer, stdio: "inherit" });
   rmSync(directory, { recursive: true, force: true });
-  cpSync(join(runtime, "generated"), directory, { recursive: true });
+  cpSync(join(consumer, "generated/holon-ui"), directory, { recursive: true });
 } finally {
   rmSync(temporary, { recursive: true, force: true });
 }

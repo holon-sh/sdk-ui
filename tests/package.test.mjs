@@ -1,30 +1,30 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { writeFileSync, copyFileSync, symlinkSync, cpSync, realpathSync } from "node:fs";
+import { writeFileSync, copyFileSync, symlinkSync, cpSync, mkdirSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import ts from "typescript";
 import { App } from "@modelcontextprotocol/ext-apps";
 import { fixture, temporary, typecheck } from "./helpers.mjs";
 
 const repository = dirname(dirname(fileURLToPath(import.meta.url)));
 
-// Install the holon-ui layout with either the CLI-compiled fixture or the built empty slot,
-// next to the repository's installed holon-sh.
-function install(directory, generated) {
-  cpSync(generated, join(directory, "generated"), { recursive: true });
+// Lay out a project with the CLI-compiled clients in generated/holon-ui and this repository's holon-ui
+// installed beside the repository's holon-sh.
+function install(root) {
+  cpSync(fixture("checkout"), join(root, "generated/holon-ui"), { recursive: true });
+  const directory = join(root, "node_modules/holon-ui");
+  mkdirSync(directory, { recursive: true });
   for (const name of ["runtime.mjs", "runtime.d.ts", "package.json"]) copyFileSync(join(repository, name), join(directory, name));
-  symlinkSync(realpathSync(join(repository, "node_modules/holon-sh")), join(dirname(directory), "holon-sh"));
-  symlinkSync(realpathSync(join(repository, "node_modules/@modelcontextprotocol")), join(dirname(directory), "@modelcontextprotocol"));
+  symlinkSync(realpathSync(join(repository, "node_modules/holon-sh")), join(root, "node_modules/holon-sh"));
+  symlinkSync(realpathSync(join(repository, "node_modules/@modelcontextprotocol")), join(root, "node_modules/@modelcontextprotocol"));
 }
 
 test("ordinary NodeNext and Bundler compilation enforces browser bindings, page tools, and tool contracts", async t => {
   const root = temporary(t);
-  const directory = join(root, "node_modules/holon-ui");
-  install(directory, fixture("checkout"));
+  install(root);
   symlinkSync(realpathSync(join(repository, "node_modules/zod")), join(root, "node_modules/zod"));
   writeFileSync(join(root, "package.json"), '{"type":"module"}');
-  const source = `import {App, createApps, exposeTools, registerPageTools, ToolCallError, type Resources, type Inputs, type Outputs, type InputTypes, type OutputTypes} from "holon-ui";
+  const source = `import {App, createApps, exposeTools, registerPageTools, ToolCallError, type Resources, type Inputs, type Outputs, type InputTypes, type OutputTypes} from "./generated/holon-ui/index.mjs";
 import {App as HostApp} from "@modelcontextprotocol/ext-apps";
 import {z} from "zod";
 const view = new App({name: "checkout-view", version: "1.0.0"}, {}, {autoResize: false});
@@ -76,11 +76,7 @@ try { await view.tools.get_order(input); } catch (error) {
 `;
   writeFileSync(join(root, "check.ts"), source);
   typecheck(join(root, "check.ts"));
-  const isolated = join(root, "other-app");
-  install(join(isolated, "node_modules/holon-ui"), join(repository, "generated"));
-  writeFileSync(join(isolated, "check.ts"), `import {createApps} from "holon-ui";\ncreateApps({});\n// @ts-expect-error\ncreateApps({orders: {endpoint: "https://orders.example/mcp"}});`);
-  typecheck(join(isolated, "check.ts"), [ts.ModuleResolutionKind.NodeNext]);
-  const { createApps, App: View } = await import(pathToFileURL(join(directory, "generated/index.js")));
+  const { createApps, App: View } = await import(pathToFileURL(join(root, "generated/holon-ui/index.mjs")));
   const view = new View({ name: "checkout-view", version: "1" });
   assert.ok(view instanceof App);
   assert.equal(typeof view.tools.get_order, "function");
