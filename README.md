@@ -1,41 +1,20 @@
 # holon-ui
 
-Typed MCP clients for browser pages: views that run inside an MCP Apps host, or standalone pages that talk to MCP servers directly. The [`holon` CLI](https://github.com/holon-sh/cli) generates your app's clients into its `generated/holon-ui/` directory, beside its `package.json`, and maps `#holon-ui` to them there. Clients validate arguments before each call and results after it, and can expose tools to the page's WebMCP agent.
-
-`holon-ui` contains only browser code. Server code uses `holon-sh` ([Node.js](https://github.com/holon-sh/sdk-ts) or [Python](https://github.com/holon-sh/sdk-py)). Start with the [CLI README](https://github.com/holon-sh/cli) for the walkthrough.
+Typed MCP clients for browser pages: views inside an MCP Apps host, or standalone pages that call MCP servers directly. The [`holon` CLI](https://github.com/holon-sh/cli) generates them into `generated/holon-ui/`, imported as `#holon-ui`. Server code uses `holon-sh` ([Node.js](https://github.com/holon-sh/sdk-ts) or [Python](https://github.com/holon-sh/sdk-py)).
 
 ## Install
 
-In the app's root directory, next to its `server.json`:
+In the app's root directory, next to its `server.json` and `package.json`:
 
 ```sh
-npm install holon-ui@dev
+npm install holon-ui@dev @modelcontextprotocol/ext-apps
 ```
-
-Declare `holon-ui` in the app root's `package.json` even when the view's sources live in a subdirectory: `holon types generate` writes browser clients into `generated/holon-ui/` beside the `package.json` that declares `holon-ui` (and Node clients into `generated/holon-sh/` when it declares `holon-sh` too). The generated module imports `holon-ui/runtime` and, for `App`, `@modelcontextprotocol/ext-apps`, so the app installs both.
-
-## The generated module
-
-```typescript
-import { App, ToolCallError, createApps, exposeTools, registerPageTools, type Inputs, type Outputs, type Resources } from "#holon-ui";
-```
-
-| Export | What it is |
-|---|---|
-| `App` | The `App` from `@modelcontextprotocol/ext-apps` with your own server's `tools`, `resources` and `callTool` typed. Calls go through the host that embeds the page. |
-| `createApps(bindings, options?)` | Clients for servers you reach by endpoint, keyed like `bindings`. |
-| `ToolCallError` | Thrown by `tools.<tool>` when a tool reports an error or asks for more input. |
-| `exposeTools(client, options?)` | Registers a client's tools with the page's WebMCP agent. |
-| `registerPageTools(tools, options?)` | Registers tools implemented by the page itself. |
-| `Inputs`, `Outputs`, `Resources` | Argument, result and resource value types, as `Inputs["dep"]["tool"]`. |
-
-Your own server appears under the last segment of its `server.json` name, e.g. `example.com/checkout` → `checkout`: `Inputs["checkout"]`, `Outputs["checkout"]`, and `createApps({ checkout: { endpoint } })` for a standalone page. Every other key is a dependency declared in `server.json`.
 
 ## Bind a client
 
 ### Inside an MCP Apps host
 
-A view embedded in an MCP Apps host calls its own server through the host, which owns the connection and the credentials. Construct and connect `App` exactly as you would the one from `@modelcontextprotocol/ext-apps`; it is that class with typed members added:
+`App` is the `App` from `@modelcontextprotocol/ext-apps` with typed members added. Calls go through the host:
 
 ```typescript
 import { App } from "#holon-ui";
@@ -52,6 +31,8 @@ The host owns the tool catalog, so `listTools`, `exposeTools` and `watch` need a
 ### Directly to an endpoint
 
 ```typescript
+import { createApps } from "#holon-ui";
+
 const apps = createApps({
   checkout: { endpoint: new URL("/mcp", location.origin) },
   orders: { endpoint: "https://orders.example.com/mcp" },
@@ -60,9 +41,11 @@ const apps = createApps({
 const order = await apps.orders.tools.lookup({ id: "A-1" }, { timeout: 5000 });
 ```
 
-An endpoint binding takes `endpoint`, and optionally `authProvider`, `fetch`, and `scoped: true` to close the session after every call. Otherwise a client keeps one session open; call `close()` when the page no longer needs it.
+Your own server is keyed by the last segment of its `server.json` name, e.g. `example.com/checkout` → `checkout`; every other key is a dependency.
 
-A tool can stop and ask for input through an MCP elicitation. Pass `elicit` to answer it, and the call returns its usual typed output:
+A binding also takes `authProvider`, `fetch`, and `scoped: true` to close the session after every call; otherwise call `close()` when done.
+
+A tool can ask for input through an MCP elicitation. Pass `elicit` to answer it:
 
 ```typescript
 const { shipped } = await apps.orders.tools.ship({ id: "A-1" }, {
@@ -83,17 +66,17 @@ const lifetime = new AbortController();
 await apps.orders.resources["orders://summary"].watch(value => render(value.open), { signal: lifetime.signal });
 ```
 
-`watch` calls back with the current value and then on every update, until the signal aborts; the server must support resource subscriptions.
+`watch` needs a server that supports resource subscriptions.
 
 ## Give tools to the page's agent
 
-`exposeTools` registers the tools of an endpoint-bound client with the page's WebMCP context (`navigator.modelContext`), except those whose `_meta.ui.visibility` omits `"model"`. Calls from the agent go through the client, so they are validated. An agent can only supply arguments, so a question reaches it as a failed call naming the question; to answer for it, pass an `execute` that calls `callTool` with `elicit`. It returns `false` when the browser has no WebMCP context.
+`exposeTools` registers an endpoint-bound client's tools with the page's WebMCP context (`navigator.modelContext`), except those whose `_meta.ui.visibility` omits `"model"`. It returns `false` when the browser has no WebMCP context.
 
 ```typescript
 await exposeTools(apps.orders, { signal: lifetime.signal });
 ```
 
-`registerPageTools` registers tools the page implements itself. Input schemas are Standard Schema validators that can produce JSON Schema, such as Zod 4. Pass `view` to register with the MCP Apps host; without it they go to WebMCP. Aborting the signal unregisters them.
+`registerPageTools` registers tools the page implements, with Standard Schema inputs such as Zod 4. Pass `view` to register with the MCP Apps host instead of WebMCP.
 
 ```typescript
 import { z } from "zod";
@@ -113,41 +96,6 @@ await registerPageTools(
 );
 ```
 
-## Build and serve a view
-
-The server serves the view as one HTML file, so bundle it into a single file. With Vite, in the app root:
-
-```typescript
-// vite.config.ts
-import { defineConfig } from "vite";
-import { viteSingleFile } from "vite-plugin-singlefile";
-
-export default defineConfig({ root: "ui", plugins: [viteSingleFile()], build: { outDir: "../dist", emptyOutDir: true } });
-```
-
-```sh
-npm install --save-dev vite vite-plugin-singlefile
-npm install @modelcontextprotocol/ext-apps
-npx vite build
-```
-
-Then serve `dist/index.html` from the server as an [MCP App](https://modelcontextprotocol.io/extensions/apps/overview) resource.
-
-## Low-level runtime
-
-`holon-ui/runtime` exports what the generated module calls: `createApps(identity, contracts, bindings?, options?)`, `bindApps`, `appClass(identity, contracts, own)`, `exposeTools`, `registerPageTools`, `ToolCallError`, and the `EndpointBinding`, `View` and page-tool types. Apps use the generated module instead.
-
-## Develop
-
-```sh
-npm ci
-npm test
-```
-
 ## Community
 
 Ask questions and share what you're building on the [Holon Discord](https://discord.gg/jXExyBdy).
-
-## License
-
-[Apache License 2.0](LICENSE)
