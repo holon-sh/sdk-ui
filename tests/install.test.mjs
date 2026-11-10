@@ -26,7 +26,6 @@ test("the packed package installs with registry dependencies and runs the projec
   const installed = spawnSync("npm", ["install", "--no-audit", "--no-fund", "--prefer-offline"], { cwd: consumer, encoding: "utf8" });
   assert.equal(installed.status, 0, installed.stderr);
   const metadata = JSON.parse(readFileSync(join(consumer, "node_modules/holon-ui/package.json"), "utf8"));
-  assert.deepEqual(metadata.holon, { contractVersion: 3 });
   assert.deepEqual(Object.keys(metadata.dependencies), ["holon-sh"]);
   // holon writes the clients into the project and maps #holon-ui to them; nothing is copied into node_modules.
   cpSync(fixture("checkout"), join(consumer, "generated/holon-ui"), { recursive: true });
