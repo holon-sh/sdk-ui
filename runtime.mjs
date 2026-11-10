@@ -27,6 +27,26 @@ export function appClass(identity, contracts, own) {
   };
 }
 
+const hasFile = node => Array.isArray(node) ? node.some(hasFile) : typeof node === "object" && node !== null && ("x-mcp-file" in node || Object.values(node).some(hasFile));
+
+// An agent writes arguments as tokens, so it is not shown a file argument (x-mcp-file): an anyOf or oneOf branch that
+// holds one is left out, and a tool that still has one is not exposed.
+// https://github.com/modelcontextprotocol/experimental-ext-file-uploads/blob/main/specification/draft/file-uploads.md#file-arguments
+function withoutFiles(schema) {
+  const prune = node => {
+    if (Array.isArray(node)) return node.map(prune);
+    if (typeof node !== "object" || node === null) return node;
+    const pruned = Object.fromEntries(Object.entries(node).map(([key, value]) => [key, prune(value)]));
+    for (const key of ["anyOf", "oneOf"]) {
+      const kept = Array.isArray(pruned[key]) ? pruned[key].filter(branch => !hasFile(branch)) : [];
+      if (kept.length) pruned[key] = kept;
+    }
+    return pruned;
+  };
+  const pruned = hasFile(schema) ? prune(schema) : schema;
+  return hasFile(pruned) ? undefined : pruned;
+}
+
 export async function exposeTools(app, options = {}) {
   const context = globalThis.document?.modelContext ?? globalThis.navigator?.modelContext;
   if (!context) return false;
@@ -35,15 +55,18 @@ export async function exposeTools(app, options = {}) {
     const result = await app.callTool({ name, arguments: args }, { signal });
     // An agent can only supply arguments, so it cannot answer. A custom execute can.
     if (result.resultType === "input_required") throw new ToolCallError("page", name, result);
-    return result;
+    const { downloads, ...shown } = result;
+    return shown;
   });
   const { tools } = await app.listTools({ signal });
   for (const tool of tools) {
     // MCP Apps: a tool whose visibility omits "model" must not reach the agent; absent means ["model", "app"].
     // https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx#resource-discovery
     if (!(tool._meta?.ui?.visibility ?? ["model"]).includes("model")) continue;
+    const inputSchema = withoutFiles(tool.inputSchema);
+    if (!inputSchema) continue;
     await context.registerTool({
-      name: tool.name, title: tool.title, description: tool.description ?? "", inputSchema: tool.inputSchema, annotations: tool.annotations,
+      name: tool.name, title: tool.title, description: tool.description ?? "", inputSchema, annotations: tool.annotations,
       execute: args => execute(tool.name, args ?? {}),
     }, { signal });
   }

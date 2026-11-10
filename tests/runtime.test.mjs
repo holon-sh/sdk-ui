@@ -83,6 +83,22 @@ test("exposeTools tells the agent about a question it cannot answer", { timeout:
   await assert.rejects(registered[0].execute({}), { name: "ToolCallError", message: "page.ship: additional input required: Which size should I ship?" });
 });
 
+test("exposeTools keeps file arguments and returned files away from the agent", async t => {
+  const file = { type: "object", "x-mcp-file": {}, properties: { id: { type: "string" } }, required: ["id"] };
+  const tools = [
+    { name: "upload", inputSchema: { type: "object", properties: { file } } },
+    { name: "linked", inputSchema: { type: "object", properties: { file: { $ref: "#/$defs/file" } }, $defs: { file } } },
+    { name: "source", inputSchema: { type: "object", properties: { source: { anyOf: [{ type: "string" }, { type: "array", items: file }] } } } },
+  ];
+  const registered = [];
+  globalThis.document = { modelContext: { registerTool: async tool => { registered.push(tool); } } };
+  t.after(() => { delete globalThis.document; });
+  const app = { listTools: async () => ({ tools }), callTool: async () => ({ resultType: "complete", content: [], downloads: [{ blob: async () => new Blob() }] }) };
+  await exposeTools(app);
+  assert.deepEqual(registered.map(({ name, inputSchema }) => [name, inputSchema]), [["source", { type: "object", properties: { source: { anyOf: [{ type: "string" }] } } }]]);
+  assert.deepEqual(await registered[0].execute({ source: "notes.txt" }), { resultType: "complete", content: [] });
+});
+
 test("the App class calls the app's own tools and resources through a real MCP Apps host", async t => {
   const input = z.strictObject({ id: z.string() });
   const summary = z.toJSONSchema(z.object({ total: z.number() }));
