@@ -55,7 +55,6 @@ export async function exposeTools(app, options = {}) {
     const result = await app.callTool({ name, arguments: args }, { signal });
     // An agent can only supply arguments, so it cannot answer. A custom execute can.
     if (result.resultType === "input_required") throw new ToolCallError("page", name, result);
-    // Fetching a returned file is the page's choice; a custom execute can.
     const { downloads, ...shown } = result;
     return shown;
   });
