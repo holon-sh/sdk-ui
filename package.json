@@ -12,9 +12,6 @@
   "publishConfig": {
     "access": "public"
   },
-  "holon": {
-    "contractVersion": 2
-  },
   "exports": {
     "./runtime": {
       "types": "./runtime.d.ts",
