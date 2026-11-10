@@ -1,6 +1,6 @@
 # holon-ui
 
-[![Docs](https://img.shields.io/badge/docs-holon--labs.dev-blue)](https://holon-labs.dev/docs/)
+[![Docs](https://img.shields.io/badge/docs-holonlabs.ai-blue)](https://holonlabs.ai/docs/)
 
 Typed MCP clients for browser pages: MCP App views, and pages that call MCP servers directly.
 
