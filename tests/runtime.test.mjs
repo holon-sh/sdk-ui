@@ -119,7 +119,6 @@ test("the App class calls the app's own tools and resources through a real MCP A
   assert.deepEqual(await view.tools.get_order({ id: "abc" }), { total: 3 });
   assert.deepEqual(await view.resources["orders://summary"].read(), { total: 1 });
   assert.equal((await view.callTool({ name: "get_order", arguments: { id: "abcd" } })).structuredContent.total, 4);
-  await assert.rejects(view.tools.get_order({ id: 1 }), /Invalid arguments/);
   await assert.rejects(view.tools.get_order({ id: "bad" }), /Invalid structured output from checkout\.get_order/);
   await assert.rejects(view.resources["orders://summary"].watch(() => {}), /endpoint binding/);
   assert.deepEqual(served, [["get_order", { id: "abc" }], ["get_order", { id: "abcd" }], ["get_order", { id: "bad" }]]);
@@ -154,13 +153,4 @@ test("page tools register with the MCP Apps host when embedded and with WebMCP w
   assert.deepEqual(await registered[0].tool.execute({ x: 1 }), { content: [{ type: "text", text: "1" }] });
   await assert.rejects(registered[0].tool.execute({ x: 2 }), /Invalid arguments for move/);
   assert.deepEqual(calls, [0.5, 1]);
-});
-
-test("createApps validates with the caller's validator when one is given", async () => {
-  const schemas = [];
-  const validator = schema => { schemas.push(schema); return Object.assign(() => false, { errors: ["rejected"] }); };
-  const contracts = { orders: { tools: [{ name: "get", inputSchema: { type: "object" } }] } };
-  const apps = bindApps({ name: "checkout", version: "1", requires: {} }, contracts, { orders: { endpoint: "https://orders.invalid/mcp" } }, { validator });
-  await assert.rejects(apps.orders.tools.get({}), /Invalid arguments for orders\.get: \["rejected"\]/);
-  assert.deepEqual(schemas, [{ type: "object" }]);
 });

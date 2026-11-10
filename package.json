@@ -31,7 +31,7 @@
     "fixtures": "node scripts/fixtures.mjs"
   },
   "dependencies": {
-    "holon-sh": "^0.0.1-dev.6"
+    "holon-sh": "^0.0.1-dev.8"
   },
   "peerDependencies": {
     "@modelcontextprotocol/ext-apps": ">=1.0.0"
