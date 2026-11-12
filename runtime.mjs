@@ -12,8 +12,10 @@ export function createApps(identity, contracts, bindings, options) {
 
 // appClass returns the ext-apps App with the app's own tools and resources (contracts[own]) typed.
 // Calls go through the host that embeds the page, so connect the App first, as with any App.
+// Unless told otherwise, the page introduces itself to the host as the app.
 export function appClass(identity, contracts, own) {
   return class extends App {
+    constructor(info = { name: identity.name, version: identity.version }, ...rest) { super(info, ...rest); }
     #client = bindApps(identity, { [own]: contracts[own] }, { [own]: {} }, {
       session: () => ({
         callTool: (request, { signal, timeout } = {}) => this.callServerTool(request, { signal, timeout }),

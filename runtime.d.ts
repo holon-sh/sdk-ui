@@ -9,7 +9,7 @@ export declare function createApps(identity: Identity, contracts: Record<string,
 export declare function bindApps(identity: Identity, contracts: Record<string, Contract | null>, bindings: Record<string, EndpointBinding>, options?: CreateOptions): Readonly<Record<string, RuntimeClient>>;
 /** The ext-apps App with the app's own tools and resources typed; calls go through the host that embeds the page. */
 export type View = App & Pick<RuntimeClient, "tools" | "resources" | "callTool">;
-export declare function appClass(identity: Identity, contracts: Record<string, Contract | null>, own: string): new (...args: ConstructorParameters<typeof App>) => View;
+export declare function appClass(identity: Identity, contracts: Record<string, Contract | null>, own: string): new (info?: ConstructorParameters<typeof App>[0], ...rest: ConstructorParameters<typeof App> extends [unknown, ...infer Rest] ? Rest : never) => View;
 export interface ExposeOptions { signal?: AbortSignal; execute?: (name: string, args: Record<string, unknown>) => Promise<unknown> }
 export declare function exposeTools(app: Pick<RuntimeClient, "callTool" | "listTools">, options?: ExposeOptions): Promise<boolean>;
 export type PageResult<I> = { readonly value: I; readonly issues?: undefined } | { readonly issues: ReadonlyArray<{ readonly message: string }> };
