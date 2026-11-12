@@ -1,15 +1,20 @@
+# Every merge to main publishes a dev build, 0.0.1-dev.<run number>, under npm's latest tag, so a
+# plain `npm install holon-ui` gets the newest one. npm trusts this workflow by name to publish.
 name: Publish dev release
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      channel:
-        description: Release channel (only "dev" is supported)
-        type: string
-        default: dev
 permissions:
   contents: read
+concurrency:
+  group: publish
+  cancel-in-progress: false
 jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
   publish:
+    needs: ci
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -18,14 +23,6 @@ jobs:
     env:
       VERSION: 0.0.1-dev.${{ github.run_number }}
     steps:
-      - name: Validate channel
-        env:
-          CHANNEL: ${{ inputs.channel }}
-        run: |
-          if [ "$CHANNEL" != dev ]; then
-            echo "::error::Unsupported channel '$CHANNEL'; only 'dev' can be published from this workflow."
-            exit 1
-          fi
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -34,26 +31,6 @@ jobs:
       - name: Update npm for trusted publishing
         run: npm install -g npm@11
       - run: npm ci
-      - run: npm test
       - name: Set the dev version (not committed)
         run: npm version "$VERSION" --no-git-tag-version
-      - run: npm pack --dry-run
-      - name: Publish to npm under the dev tag
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -n "$NPM_TOKEN" ]; then
-            echo "//registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}" > "$HOME/.npmrc"
-            export NODE_AUTH_TOKEN="$NPM_TOKEN"
-          fi
-          npm publish --tag dev --access public --provenance
-      - name: Summarize
-        run: |
-          {
-            echo "## holon-ui $VERSION (dev)"
-            echo
-            echo '```sh'
-            echo "npm install holon-ui@$VERSION"
-            echo "npm install holon-ui@dev"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+      - run: npm publish --tag latest --access public --provenance

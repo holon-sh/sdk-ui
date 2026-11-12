@@ -7,7 +7,7 @@ Typed MCP clients for browser pages: MCP App views, and pages that call MCP serv
 ## Install
 
 ```sh
-npm install holon-ui@dev
+npm install holon-ui
 npm install -D holon-types typescript
 ```
 
