@@ -33,6 +33,4 @@ jobs:
       - run: npm ci
       - name: Set the dev version (not committed)
         run: npm version "$VERSION" --no-git-tag-version
-      - run: npm pack --dry-run
       - run: npm publish --tag latest --access public --provenance
-      - run: echo "Published \`holon-ui@$VERSION\`" >> "$GITHUB_STEP_SUMMARY"
