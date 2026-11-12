@@ -126,6 +126,20 @@ test("the App class calls the app's own tools and resources through a real MCP A
   await view.close();
   await bridge.close();
 });
+test("a view introduces itself to its host as the app, unless told otherwise", async () => {
+  const View = appClass({ name: "example.com/checkout", version: "1.2.0", requires: {} }, { checkout: null }, "checkout");
+  for (const [info, introduced] of [[undefined, { name: "example.com/checkout", version: "1.2.0" }], [{ name: "checkout-view", version: "1" }, { name: "checkout-view", version: "1" }]]) {
+    const view = new View(info, {}, { autoResize: false });
+    const bridge = new AppBridge(null, { name: "host", version: "1" }, {});
+    const [viewTransport, hostTransport] = InMemoryTransport.createLinkedPair();
+    await bridge.connect(hostTransport);
+    await view.connect(viewTransport);
+    assert.deepEqual(bridge.getAppVersion(), introduced);
+    await view.close();
+    await bridge.close();
+  }
+});
+
 
 test("page tools register with the MCP Apps host when embedded and with WebMCP when standalone", async t => {
   t.after(() => { delete globalThis.document; });
