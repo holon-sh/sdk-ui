@@ -32,7 +32,7 @@
     "README.md"
   ],
   "scripts": {
-    "test": "node --test tests/*.test.mjs && node --conditions=mcp-app --test tests/mcp-app/*.test.mjs",
+    "test": "node --test tests/*.test.mjs && node --conditions=mcp-app --conditions=browser --disallow-code-generation-from-strings --test tests/mcp-app/*.test.mjs",
     "fixtures": "node scripts/fixtures.mjs"
   },
   "dependencies": {

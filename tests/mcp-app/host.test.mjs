@@ -1,4 +1,5 @@
-// Run under the mcp-app condition, as an MCP Apps view's build sets it (see package.json's test script).
+// Run as a view runs in a host (see package.json's test script): built with the mcp-app and browser conditions, and
+// under a content security policy without unsafe-eval, which MCP Apps hosts set.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { App } from "@modelcontextprotocol/ext-apps";
