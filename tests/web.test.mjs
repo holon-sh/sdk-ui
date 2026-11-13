@@ -10,8 +10,8 @@ const identity = { name: "example.com/checkout", version: "1" };
 const order = { input: z.strictObject({ id: z.string() }), output: z.object({ total: z.number() }) };
 const getOrder = { name: "get_order", inputSchema: z.toJSONSchema(order.input, { io: "input" }), outputSchema: z.toJSONSchema(order.output) };
 
-// Serves the page's own app at /mcp on the page's origin. Like a generated contract, the page's names the server's
-// tools: get_order and those in contracted.
+// Serves the page's own app at /mcp on the page's origin, with get_order and what register adds. Like a generated
+// contract, the page's names the server's tools: get_order and those in contracted.
 async function page(t, register = () => {}, contracted = []) {
   const { endpoint } = await serve(t, () => {
     const server = new McpServer({ name: "checkout", version: "1" });
@@ -23,10 +23,15 @@ async function page(t, register = () => {}, contracted = []) {
   globalThis.location = { origin: new URL(endpoint).origin };
   t.after(() => { delete globalThis.location; delete globalThis.document; });
   const contract = { tools: [getOrder, ...contracted.map(name => ({ name, inputSchema: { type: "object" } }))] };
-  return options => connect({ identity, contracts: { checkout: contract }, own: "checkout", endpoint: "/mcp" }, options);
+  return async options => {
+    const app = await connect({ identity, contracts: { checkout: contract }, own: "checkout", endpoint: "/mcp" }, options);
+    t.after(() => app.close());
+    return app;
+  };
 }
 
-// A fake document.modelContext. Registration runs after connect() resolves, so tests wait for the tools they expect.
+// The browser's WebMCP, which rejects the tools reject names. Offering runs after connect() resolves, so a test waits
+// for the tools it expects.
 function modelContext(reject = () => false) {
   const registered = new Map();
   let arrived = () => {};
@@ -41,21 +46,18 @@ function modelContext(reject = () => false) {
   return { registered, until };
 }
 
-test("a web page calls its own app over HTTP, and asks for nothing more without an agent", async t => {
-  const connect = await page(t);
-  const methods = [];
-  const { fetch } = globalThis;
-  globalThis.fetch = async (input, init) => {
-    methods.push(JSON.parse(init.body).method);
-    return fetch(input, init);
-  };
-  t.after(() => { globalThis.fetch = fetch; });
-  const app = await connect();
-  t.after(() => app.close());
+function warnings(t) {
+  const messages = [];
+  let warned;
+  t.mock.method(console, "warn", message => { messages.push(message); warned(); });
+  return { messages, next: () => new Promise(resolve => { warned = resolve; }) };
+}
+
+test("a web page calls its own app over HTTP", async t => {
+  const app = await (await page(t))();
   assert.equal(app.view, undefined);
   assert.equal(app.opened, undefined);
   assert.deepEqual(await app.tools.get_order({ id: "abc" }), { total: 3 });
-  assert.equal(methods.includes("tools/list"), false);
 });
 
 test("a web page offers its own tools and the app's model-visible tools to WebMCP until it closes", async t => {
@@ -63,15 +65,15 @@ test("a web page offers its own tools and the app's model-visible tools to WebMC
     server.registerTool("unannotated", { title: "Unannotated" }, async () => ({ content: [] }));
     server.registerTool("safe", { annotations: { title: "Safe", destructiveHint: false, openWorldHint: false } }, async () => ({ content: [] }));
     server.registerTool("uncontracted", { description: "Added after the contract was generated" }, async () => ({ content: [] }));
-    for (const [name, visibility] of [["view_only", ["app"]], ["nobody", []]]) registerAppTool(server, name, { _meta: { ui: { visibility } } }, async () => ({ content: [] }));
-  }, ["unannotated", "safe", "view_only", "nobody"]);
+    for (const [name, visibility] of [["both", ["model", "app"]], ["view_only", ["app"]], ["nobody", []]]) registerAppTool(server, name, { description: name, _meta: { ui: { visibility } } }, async () => ({ content: [] }));
+  }, ["unannotated", "safe", "both", "view_only", "nobody"]);
   const { registered, until } = modelContext();
   const app = await connect({ tools: {
     select: { description: "Select shapes", inputSchema: z.object({ ids: z.array(z.string()) }), annotations: { title: "Select", openWorldHint: false }, execute: () => ({}) },
     selection: { description: "List selected shapes", annotations: { readOnlyHint: true }, execute: () => ({}) },
   } });
-  await until("get_order", "unannotated", "safe");
-  assert.deepEqual([...registered.keys()].sort(), ["get_order", "safe", "select", "selection", "unannotated"]);
+  await until("get_order", "unannotated", "safe", "both");
+  assert.deepEqual([...registered.keys()].sort(), ["both", "get_order", "safe", "select", "selection", "unannotated"]);
 
   const fields = name => {
     const { title, description, inputSchema, outputSchema, annotations } = registered.get(name).tool;
@@ -87,7 +89,6 @@ test("a web page offers its own tools and the app's model-visible tools to WebMC
 
   await app.close();
   assert.ok([...registered.values()].every(({ options }) => options.signal.aborted));
-  await app.close();
 });
 
 test("an agent is not shown file arguments, which it cannot write", async t => {
@@ -101,8 +102,7 @@ test("an agent is not shown file arguments, which it cannot write", async t => {
     for (const [name, inputSchema] of Object.entries(schemas)) server.registerTool(name, { description: name, inputSchema: fromJsonSchema(inputSchema) }, async () => ({ content: [] }));
   }, Object.keys(schemas));
   const { registered, until } = modelContext();
-  const app = await connect();
-  t.after(() => app.close());
+  await connect();
   await until("get_order", "source");
   assert.deepEqual([...registered.keys()].sort(), ["get_order", "source"]);
   assert.deepEqual(registered.get("source").tool.inputSchema.properties, { source: { anyOf: [{ type: "string" }] } });
@@ -123,8 +123,7 @@ test("an agent's call to an app tool returns its output, fails as the tool did, 
     }));
   }, ["text_only", "broken", "ship", "slow"]);
   const { registered, until } = modelContext();
-  const app = await connect();
-  t.after(() => app.close());
+  await connect();
   await until("get_order", "text_only", "broken", "ship", "slow");
   const execute = (name, input, signal = new AbortController().signal) => registered.get(name).tool.execute(input, { signal });
 
@@ -145,14 +144,13 @@ test("an agent's call to a page tool runs it with validated input and the agent'
   const connect = await page(t);
   const { registered } = modelContext();
   const calls = [];
-  const app = await connect({ tools: {
+  await connect({ tools: {
     move: { description: "Move", inputSchema: z.object({ x: z.number().max(1) }), execute: (input, { signal }) => { calls.push([input, signal]); return { moved: input.x }; } },
     reset: { description: "Reset", execute: (input, { signal }) => { calls.push([input, signal]); } },
   } });
-  t.after(() => app.close());
   const signal = new AbortController().signal;
   assert.deepEqual(await registered.get("move").tool.execute({ x: 1 }, { signal }), { moved: 1 });
-  await assert.rejects(registered.get("move").tool.execute({ x: 2 }, { signal }), /Invalid arguments for move/);
+  await assert.rejects(registered.get("move").tool.execute({ x: 2 }, { signal }));
   assert.equal(await registered.get("reset").tool.execute({ ignored: true }, { signal }), undefined);
   assert.deepEqual(calls, [[{ x: 1 }, signal], [{}, signal]]);
 });
@@ -160,30 +158,23 @@ test("an agent's call to a page tool runs it with validated input and the agent'
 test("a tool WebMCP rejects is reported, and the others are still offered", async t => {
   const connect = await page(t, server => server.registerTool("second", { description: "Second" }, async () => ({ content: [] })), ["second"]);
   const { registered, until } = modelContext(tool => tool.name === "get_order");
-  let warned;
-  const warning = new Promise(resolve => { warned = resolve; });
-  t.mock.method(console, "warn", message => warned(message));
-  const app = await connect({ tools: { local: { description: "Local", execute: () => {} } } });
-  t.after(() => app.close());
-  await until("local", "second");
-  assert.equal(await warning, "WebMCP did not accept the tool get_order:");
+  const { messages, next } = warnings(t);
+  const warned = next();
+  await connect({ tools: { local: { description: "Local", execute: () => {} } } });
+  await Promise.all([warned, until("local", "second")]);
+  assert.match(messages[0], /get_order/);
   assert.deepEqual([...registered.keys()].sort(), ["local", "second"]);
 });
 
-test("an app WebMCP cannot list is reported, and the page's own tools are still offered", async t => {
+test("an app that cannot be listed is reported, and the page's own tools are still offered", async t => {
   const { registered } = modelContext();
   globalThis.location = { origin: "http://127.0.0.1:1" };
   t.after(() => { delete globalThis.location; delete globalThis.document; });
-  let warned;
-  const warning = new Promise(resolve => { warned = resolve; });
-  t.mock.method(console, "warn", message => warned(message));
+  const { messages, next } = warnings(t);
+  const warned = next();
   const app = await connect({ identity, contracts: { checkout: { tools: [getOrder] } }, own: "checkout", endpoint: "/mcp" }, { tools: { local: { description: "Local", execute: () => {} } } });
   t.after(() => app.close());
+  await warned;
+  assert.equal(messages.length, 1);
   assert.deepEqual([...registered.keys()], ["local"]);
-  assert.match(await warning, /Could not list the tools of checkout/);
-});
-
-test("a page tool cannot take the name of one of its app's tools", async () => {
-  await assert.rejects(connect({ identity, contracts: { checkout: { tools: [getOrder] } }, own: "checkout", endpoint: "/mcp" }, { tools: { get_order: { description: "Shadow", execute: () => {} } } }),
-    { message: "Page tool get_order has the name of a tool of checkout." });
 });

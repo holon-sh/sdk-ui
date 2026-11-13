@@ -75,7 +75,7 @@ try {
 }
 
 // connect as the generated module narrows it to the page's own app.
-declare const connect: Connect<Inputs["checkout"], Outputs["checkout"], Resources["checkout"]>;
+declare const connect: Connect<Apps["checkout"]>;
 const page = await connect({
   tools: {
     select: { description: "Select", inputSchema: z.object({ ids: z.array(z.string()) }), execute: ({ ids }, { signal }) => ids.length + Number(signal.aborted) },
@@ -90,6 +90,8 @@ const page = await connect({
 // @ts-expect-error The app has no lookup tool.
 page.tools.lookup;
 const opened = await page.opened;
+// @ts-expect-error Until narrowed by its tool, the output is not known.
+opened?.output.total;
 if (opened?.tool === "get_order") opened.output.total.toFixed();
 if (page.view) page.view.onhostcontextchanged = ({ theme }) => theme?.toUpperCase();
 // @ts-expect-error A page tool cannot take the name of one of the app's tools.

@@ -1,10 +1,15 @@
-// The host surface: the page is an MCP Apps view in a host's iframe. The host's agent already has the app's tools,
-// because the host is the app's MCP client, so the view offers it only the page's own tools, and the view's calls to
-// its app go through the host.
+// holon-ui/runtime for an MCP Apps view in a host's iframe: package.json resolves to it under the mcp-app condition,
+// which the view's build sets. The host is the app's MCP client, so its agent already has the app's tools: the view
+// offers it only the page's own tools, and calls its app through the host.
 // https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx#standard-mcp-messages
 import { App } from "@modelcontextprotocol/ext-apps";
+import { bindApps, ToolCallError } from "holon-sh/runtime";
 
-export async function open({ identity, contract, tools, view: { transport, ...options } = {}, bind }) {
+export { bindApps, ToolCallError };
+export { appClass, exposeTools, registerPageTools } from "./legacy.mjs";
+
+export async function connect({ identity, contracts, own }, { tools = {}, view: { transport, ...options } = {} } = {}) {
+  const bind = session => bindApps(identity, contracts, { [own]: { session } })[own];
   const app = new App({ name: identity.name, version: identity.version }, {}, options);
   // Registered before connecting, so the view declares the tools capability in ui/initialize.
   for (const [name, { description, inputSchema, annotations, execute }] of Object.entries(tools)) {
@@ -29,25 +34,23 @@ export async function open({ identity, contract, tools, view: { transport, ...op
     app.addEventListener("toolcancelled", ({ reason }) => reject(new Error(`The tool call that opened the view was cancelled${reason ? `: ${reason}` : "."}`)));
   });
   await app.connect(transport);
-  const client = bind({ session: {
-    callTool: (request, { signal, timeout }) => app.callServerTool(request, { signal, timeout }),
-    readResource: (request, { signal, timeout }) => app.readServerResource(request, { signal, timeout }),
-    listTools: async () => { throw new Error("An MCP Apps host owns the tool catalog, so a view cannot list tools."); },
-  } });
-  // Replaying the delivered result through the app's own client gives exactly what calling the tool would have:
-  // the same output validation, and the same ToolCallError for an error result.
-  // The host may not say which tool it was. https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx#host-context-in-mcpuiinitializeresult
-  // Without a typed method for it, the call comes as delivered; an untyped page knows every tool by name.
+  // Replaying the delivered result through the app's own client gives exactly what calling the tool would have: the
+  // same output validation and ToolCallError. When the host does not say which tool it was, the call comes as delivered.
+  // https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx#host-context-in-mcpuiinitializeresult
   const opened = delivered.then(async ({ input, result }) => {
     const tool = app.getHostContext()?.toolInfo?.tool.name;
-    const replay = tool && bind({ session: { callTool: async () => result } }).tools[tool];
-    if (replay) return { tool, input, output: await replay(input) };
-    return { tool: contract ? undefined : tool, input, output: result.structuredContent ?? result };
+    const replay = tool && bind({ callTool: async () => result }).tools[tool];
+    return replay ? { tool, input, output: await replay(input) } : { tool: undefined, input, output: result.structuredContent ?? result };
   });
   // A page that never reads opened must not see an unhandled rejection.
   opened.catch(() => {});
+  const client = bind({
+    callTool: (request, { signal, timeout }) => app.callServerTool(request, { signal, timeout }),
+    readResource: (request, { signal, timeout }) => app.readServerResource(request, { signal, timeout }),
+    listTools: async () => { throw new Error("An MCP Apps host owns the tool catalog, so a view cannot list tools."); },
+  });
   // Closing the view removes its tools from the host.
-  return { client, view: app, opened, close: () => app.close() };
+  return Object.freeze({ ...client, view: app, opened, close: () => app.close() });
 }
 
 function toolResult(value) {

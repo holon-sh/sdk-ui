@@ -15,20 +15,15 @@
   "exports": {
     "./runtime": {
       "types": "./runtime.d.ts",
-      "import": "./runtime.mjs"
-    }
-  },
-  "imports": {
-    "#surface": {
-      "mcp-app": "./surface.host.mjs",
-      "default": "./surface.web.mjs"
+      "mcp-app": "./runtime.host.mjs",
+      "default": "./runtime.web.mjs"
     }
   },
   "files": [
-    "runtime.mjs",
     "runtime.d.ts",
-    "surface.host.mjs",
-    "surface.web.mjs",
+    "runtime.host.mjs",
+    "runtime.web.mjs",
+    "legacy.mjs",
     "README.md"
   ],
   "scripts": {
