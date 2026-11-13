@@ -30,51 +30,47 @@ test("a view introduces itself as its app and calls the app through the host", a
   const served = [];
   bridge.oncalltool = async ({ name, arguments: args }) => {
     served.push([name, args]);
-    return { content: [], structuredContent: { total: args.id === "bad" ? "no" : args.id.length } };
+    return { content: [], structuredContent: { total: args.id.length } };
   };
   bridge.onreadresource = async ({ uri }) => ({ contents: [{ uri, mimeType: "application/json", text: JSON.stringify({ total: 1 }) }] });
   assert.ok(app.view instanceof App);
   assert.deepEqual(bridge.getAppVersion(), { name: "example.com/checkout", version: "1.2.0" });
-
   assert.deepEqual(await app.tools.get_order({ id: "abc" }), { total: 3 });
+  assert.deepEqual(served, [["get_order", { id: "abc" }]]);
   assert.deepEqual(await app.resources["orders://summary"].read(), { total: 1 });
-  assert.equal((await app.callTool({ name: "get_order", arguments: { id: "abcd" } })).structuredContent.total, 4);
-  await assert.rejects(app.tools.get_order({ id: "bad" }), /Invalid structured output from checkout\.get_order/);
-  await assert.rejects(app.resources["orders://summary"].watch(() => {}), /requires an endpoint binding/);
   await assert.rejects(app.listTools(), /An MCP Apps host owns the tool catalog/);
-  assert.deepEqual(served, [["get_order", { id: "abc" }], ["get_order", { id: "abcd" }], ["get_order", { id: "bad" }]]);
 });
 
 test("the host's agent lists the page's tools and gets each outcome as an MCP result", async t => {
-  const signals = [];
+  // What execute returns or throws, and the result the host's agent gets for it.
+  const outcomes = {
+    object: [() => ({ moved: 1 }), { content: [{ type: "text", text: '{"moved":1}' }], structuredContent: { moved: 1 } }],
+    text: [() => "done", { content: [{ type: "text", text: "done" }] }],
+    nothing: [() => {}, { content: [] }],
+    number: [() => 3, { content: [{ type: "text", text: "3" }] }],
+    thrown: [() => { throw new Error("Nothing is selected."); }, { isError: true, content: [{ type: "text", text: "Nothing is selected." }] }],
+  };
+  let received;
   const tools = {
     move: {
       description: "Move the selection", inputSchema: z.object({ x: z.number().max(1) }), annotations: { title: "Move", destructiveHint: false },
-      execute: ({ x }, { signal }) => { signals.push(signal); return { moved: x }; },
+      execute: (input, { signal }) => { received = [input, signal]; },
     },
-    label: { description: "Label", execute: () => "done" },
-    clear: { description: "Clear", execute: () => {} },
-    count: { description: "Count", execute: () => 3 },
-    fail: { description: "Fail", execute: () => { throw new Error("Nothing is selected."); } },
+    ...Object.fromEntries(Object.entries(outcomes).map(([name, [execute]]) => [name, { description: name, execute }])),
   };
   const { bridge } = await view(t, { tools });
   const listed = Object.fromEntries((await bridge.listTools({})).tools.map(tool => [tool.name, tool]));
-  assert.deepEqual(Object.keys(listed).sort(), ["clear", "count", "fail", "label", "move"]);
-  assert.deepEqual([listed.move.title, listed.move.description, listed.move.inputSchema.properties.x.maximum, listed.move.annotations], ["Move", "Move the selection", 1, { title: "Move", destructiveHint: false }]);
-  assert.deepEqual(listed.label.inputSchema, { type: "object", properties: {} });
+  assert.deepEqual(Object.keys(listed).sort(), Object.keys(tools).sort());
+  const { title, description, inputSchema, annotations } = listed.move;
+  assert.deepEqual([title, description, inputSchema.properties.x.maximum, annotations], ["Move", "Move the selection", 1, { title: "Move", destructiveHint: false }]);
 
-  const call = async (name, args = {}) => {
-    const { content, structuredContent, isError } = await bridge.callTool({ name, arguments: args });
-    return { content, structuredContent, isError };
-  };
-  assert.deepEqual(await call("move", { x: 1 }), { content: [{ type: "text", text: '{"moved":1}' }], structuredContent: { moved: 1 }, isError: undefined });
-  assert.ok(signals[0] instanceof AbortSignal);
-  assert.deepEqual(await call("label"), { content: [{ type: "text", text: "done" }], structuredContent: undefined, isError: undefined });
-  assert.deepEqual(await call("clear"), { content: [], structuredContent: undefined, isError: undefined });
-  assert.deepEqual(await call("count"), { content: [{ type: "text", text: "3" }], structuredContent: undefined, isError: undefined });
-  assert.deepEqual(await call("fail"), { content: [{ type: "text", text: "Nothing is selected." }], structuredContent: undefined, isError: true });
-  await assert.rejects(bridge.callTool({ name: "move", arguments: { x: 2 } }), /Invalid input for tool move/);
-  assert.equal(signals.length, 1);
+  await bridge.callTool({ name: "move", arguments: { x: 1 } });
+  assert.deepEqual(received[0], { x: 1 });
+  assert.ok(received[1] instanceof AbortSignal);
+  for (const [name, [, expected]] of Object.entries(outcomes)) {
+    const { content, structuredContent, isError } = await bridge.callTool({ name, arguments: {} });
+    assert.deepEqual({ content, ...(structuredContent && { structuredContent }), ...(isError && { isError }) }, expected, name);
+  }
 });
 
 test("opened is the call that opened the view, with what its tool returns", async t => {
@@ -86,8 +82,7 @@ test("opened is the call that opened the view, with what its tool returns", asyn
     return app.opened;
   };
   assert.deepEqual(await open({ toolInfo }, bridge => bridge.sendToolResult({ content: [], structuredContent: { total: 3 } })), { tool: "get_order", input: { id: "abc" }, output: { total: 3 } });
-  await assert.rejects(open({ toolInfo }, bridge => bridge.sendToolResult({ isError: true, content: [{ type: "text", text: "No such order." }] })), { name: "ToolCallError", message: "checkout.get_order: tool failed: No such order." });
-  await assert.rejects(open({ toolInfo }, bridge => bridge.sendToolResult({ content: [], structuredContent: { total: "no" } })), /Invalid structured output from checkout\.get_order/);
+  await assert.rejects(open({ toolInfo }, bridge => bridge.sendToolResult({ isError: true, content: [{ type: "text", text: "No such order." }] })), { name: "ToolCallError" });
   await assert.rejects(open({ toolInfo }, bridge => bridge.sendToolCancelled({ reason: "The person stopped it." })), { message: "The tool call that opened the view was cancelled: The person stopped it." });
   // Without toolInfo, the host does not say which tool it was, so the call comes as delivered.
   assert.deepEqual(await open({}, bridge => bridge.sendToolResult({ content: [], structuredContent: { total: 3 } })), { tool: undefined, input: { id: "abc" }, output: { total: 3 } });

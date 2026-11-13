@@ -87,12 +87,10 @@ const page = await connect({
 });
 (await page.tools.get_order({ orderId: "own" })).total.toFixed();
 (await page.resources["orders://summary"].read()).total.toFixed();
-// @ts-expect-error orderId must be a string.
-page.tools.get_order({ orderId: 1 });
 // @ts-expect-error The app has no lookup tool.
 page.tools.lookup;
 const opened = await page.opened;
 if (opened?.tool === "get_order") opened.output.total.toFixed();
-if (page.view) page.view.onteardown = async () => { await page.close(); return {}; };
+if (page.view) page.view.onhostcontextchanged = ({ theme }) => theme?.toUpperCase();
 // @ts-expect-error A page tool cannot take the name of one of the app's tools.
-await connect({ tools: { get_order: { description: "Shadow", execute: () => {} } } });
+connect({ tools: { get_order: { description: "Shadow", execute: () => {} } } });

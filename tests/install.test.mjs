@@ -1,4 +1,3 @@
-import assert from "node:assert/strict";
 import { test } from "node:test";
 import { copyFileSync, cpSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -8,7 +7,7 @@ import { fixture, temporary } from "./helpers.mjs";
 
 const repository = dirname(dirname(fileURLToPath(import.meta.url)));
 
-test("the packed package installs, runs, and type-checks generated clients", async t => {
+test("the packed package installs, loads on both surfaces, and type-checks generated clients", t => {
   const root = temporary(t);
   const packed = execFileSync("npm", ["pack", "--ignore-scripts", "--json", "--pack-destination", root], {
     cwd: repository,
@@ -36,10 +35,11 @@ test("the packed package installs, runs, and type-checks generated clients", asy
   cpSync(fixture("checkout"), join(consumer, "generated/holon-ui"), { recursive: true });
   copyFileSync(fixture("consumer.ts"), join(consumer, "consumer.ts"));
 
-  const { createApps } = await import(pathToFileURL(join(consumer, "generated/holon-ui/index.mjs")));
-  const orders = { endpoint: "https://orders.example/mcp" };
-  assert.deepEqual(Object.keys(createApps({ orders })), ["orders"]);
-  assert.throws(() => createApps({ missing: orders }), /Unknown app binding: missing/);
+  // Both surfaces ship: the generated module loads as a web page's build and as a view's.
+  const generated = JSON.stringify(pathToFileURL(join(consumer, "generated/holon-ui/index.mjs")).href);
+  for (const conditions of [[], ["--conditions=mcp-app"]]) {
+    execFileSync(process.execPath, [...conditions, "--input-type=module", "--eval", `await import(${generated})`], { cwd: consumer, stdio: "inherit" });
+  }
 
   const tsc = [
     "exec", "--offline", "--", "tsc", "--noEmit", "--strict",

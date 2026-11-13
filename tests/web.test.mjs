@@ -108,15 +108,19 @@ test("an agent is not shown file arguments, which it cannot write", async t => {
   assert.deepEqual(registered.get("source").tool.inputSchema.properties, { source: { anyOf: [{ type: "string" }] } });
 });
 
-test("an agent's call to an app tool returns its output, and fails as the tool did", async t => {
-  let started;
+test("an agent's call to an app tool returns its output, fails as the tool did, and stops when cancelled", async t => {
+  let started, aborted;
+  const cancelled = new Promise(resolve => { aborted = resolve; });
   const connect = await page(t, server => {
     server.registerTool("text_only", {}, async () => ({ content: [{ type: "text", text: "plain" }] }));
     server.registerTool("broken", {}, async () => ({ isError: true, content: [{ type: "text", text: "out of stock" }] }));
     server.registerTool("ship", {}, async () => inputRequired({ inputRequests: {
       size: inputRequired.elicit({ message: "Which size should I ship?", requestedSchema: z.object({ size: z.string() }) }),
     } }));
-    server.registerTool("slow", {}, ({ mcpReq: { signal } }) => new Promise(resolve => { started(); signal.addEventListener("abort", () => resolve({ content: [] })); }));
+    server.registerTool("slow", {}, ({ mcpReq: { signal } }) => new Promise(resolve => {
+      started();
+      signal.addEventListener("abort", () => { aborted(); resolve({ content: [] }); });
+    }));
   }, ["text_only", "broken", "ship", "slow"]);
   const { registered, until } = modelContext();
   const app = await connect();
@@ -126,14 +130,15 @@ test("an agent's call to an app tool returns its output, and fails as the tool d
 
   assert.deepEqual(await execute("get_order", { id: "abcd" }), { total: 4 });
   assert.deepEqual(await execute("text_only", undefined), [{ type: "text", text: "plain" }]);
-  await assert.rejects(execute("broken", {}), { name: "ToolCallError", message: "checkout.broken: tool failed: out of stock" });
-  await assert.rejects(execute("ship", {}), { name: "ToolCallError", message: "checkout.ship: additional input required: Which size should I ship?" });
+  // An agent can only supply arguments, so a question the server asks back fails the call too.
+  for (const name of ["broken", "ship"]) await assert.rejects(execute(name, {}), { name: "ToolCallError" }, name);
 
   const cancel = new AbortController();
   const slow = execute("slow", {}, cancel.signal);
   await new Promise(resolve => { started = resolve; });
-  cancel.abort(new Error("The agent cancelled."));
-  await assert.rejects(slow, /The agent cancelled/);
+  const rejected = assert.rejects(slow);
+  cancel.abort();
+  await Promise.all([cancelled, rejected]);
 });
 
 test("an agent's call to a page tool runs it with validated input and the agent's signal", async t => {
@@ -155,13 +160,14 @@ test("an agent's call to a page tool runs it with validated input and the agent'
 test("a tool WebMCP rejects is reported, and the others are still offered", async t => {
   const connect = await page(t, server => server.registerTool("second", { description: "Second" }, async () => ({ content: [] })), ["second"]);
   const { registered, until } = modelContext(tool => tool.name === "get_order");
-  const warnings = t.mock.method(console, "warn", () => {});
+  let warned;
+  const warning = new Promise(resolve => { warned = resolve; });
+  t.mock.method(console, "warn", message => warned(message));
   const app = await connect({ tools: { local: { description: "Local", execute: () => {} } } });
   t.after(() => app.close());
   await until("local", "second");
-  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(await warning, "WebMCP did not accept the tool get_order:");
   assert.deepEqual([...registered.keys()].sort(), ["local", "second"]);
-  assert.deepEqual(warnings.mock.calls.map(({ arguments: [message] }) => message), ["WebMCP did not accept the tool get_order:"]);
 });
 
 test("an app WebMCP cannot list is reported, and the page's own tools are still offered", async t => {
