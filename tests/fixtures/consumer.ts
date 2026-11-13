@@ -36,7 +36,7 @@ await registerPageTools({
 });
 
 const apps = createApps({
-  orders: { endpoint: new URL("https://orders.example/mcp"), installationUID: "installation-one" },
+  orders: { endpoint: new URL("https://orders.example/mcp"), requestInit: { headers: { "X-Holon-Installation-UID": "installation-one" } } },
   "with-hyphen": { endpoint: new URL("https://other.example/mcp") },
 });
 (await apps.orders.tools.get_order({ orderId: "direct" })).total.toFixed();
