@@ -18,7 +18,7 @@ export async function connect({ identity, contracts, own, endpoint }, { tools = 
     const { signal } = lifetime;
     const offer = tool => context.registerTool(tool, { signal }).catch(error => console.warn(`WebMCP did not accept the tool ${tool.name}:`, error));
     for (const [name, tool] of Object.entries(tools)) offer(pageTool(name, tool));
-    const contracted = name => !contracts[own] || contracts[own].tools.some(tool => tool.name === name);
+    const contracted = name => contracts[own].tools.some(tool => tool.name === name);
     client.listTools({ signal }).then(
       ({ tools: listed }) => {
         for (const tool of listed) {

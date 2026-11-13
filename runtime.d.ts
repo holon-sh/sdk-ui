@@ -27,18 +27,29 @@ type Tools<C> = C extends { tools: infer T } ? T : never;
 export type Opened<C> =
   | { [K in keyof Tools<C> & string]: Tools<C>[K] extends (input: infer I, ...rest: never[]) => Promise<infer O> ? { tool: K; input: I; output: O } : never }[keyof Tools<C> & string]
   | { tool: undefined; input: Record<string, unknown>; output: unknown };
-/** The page's own app C, called through the host in an MCP Apps view and over HTTP on a web page. close() also unregisters the page's tools and closes the view. */
-export type Page<C> = C & {
-  /** The connected ext-apps App in an MCP Apps host; undefined on a web page. */
-  readonly view: App | undefined;
-  /** In an MCP Apps host, the tool call that opened the view, with the output its tool returns; undefined on a web page. */
-  readonly opened: Promise<Opened<C>> | undefined;
+type Resources<C> = C extends { readonly resources: infer R } ? R : never;
+/** What a view can do with its app: call its tools and read its resources. */
+type Relayed<C> = Pick<C, Extract<keyof C, "tools" | "callTool" | "close">> & {
+  readonly resources: { readonly [U in keyof Resources<C>]: Pick<Resources<C>[U], Extract<keyof Resources<C>[U], "read">> };
 };
+/** The page's own app C, as a view in an MCP Apps host or as a web page, told apart by view. Only a web page can list the app's tools, watch a resource or subscribe to events. close() also unregisters the page's tools and closes the view. */
+export type Page<C> =
+  | (Relayed<C> & {
+    /** The connected ext-apps App, for host-only features. */
+    readonly view: App;
+    /** The tool call that opened the view, with the output its tool returns. */
+    readonly opened: Promise<Opened<C>>;
+  })
+  | (C & {
+    /** Undefined on a web page. */
+    readonly view: undefined;
+    readonly opened: undefined;
+  });
 /** connect, narrowed by the generated #holon-ui module to the client C of the project's own app. A page tool cannot take the name of one of the app's tools. */
 export type Connect<C> = <S extends Record<string, unknown> = {}>(options?: ConnectOptions<S> & { tools?: { [K in keyof Tools<C>]?: never } }) => Promise<Page<C>>;
 /** Bind the page to its own app on the surface its build chose, and offer every tool to whichever agent is present. Most pages call the generated connect from #holon-ui. */
-export declare function connect<S extends Record<string, unknown> = {}>(
-  app: { identity: Identity; contracts: Record<string, Contract | null>; own: string; /** The app's MCP endpoint on the page's origin, such as "/mcp/checkout". */ endpoint: string },
+export declare function connect<S extends Record<string, unknown> = {}, Own extends string = string>(
+  app: { identity: Identity; /** Must include the contract of the page's own app. */ contracts: Record<string, Contract | null> & Record<NoInfer<Own>, Contract>; own: Own; /** The app's MCP endpoint on the page's origin, such as "/mcp/checkout". */ endpoint: string },
   options?: ConnectOptions<S>,
 ): Promise<Page<RuntimeClient>>;
 
