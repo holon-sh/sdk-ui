@@ -1,7 +1,22 @@
 import { App } from "@modelcontextprotocol/ext-apps";
 import { bindApps, ToolCallError } from "holon-sh/runtime";
+import { open } from "#surface";
+import { withoutFiles } from "./surface.web.mjs";
 
 export { bindApps, ToolCallError };
+
+// connect binds the page to its own app on the surface its bundle was built for: package.json's imports map resolves
+// #surface to the MCP Apps view under the mcp-app condition, which the view's build sets, and to a web page otherwise.
+export async function connect({ identity, contracts, own, endpoint }, { tools = {}, view } = {}) {
+  const contract = contracts[own] ?? null;
+  // An agent could not tell a page tool from the app's tool of the same name.
+  for (const name of Object.keys(tools)) {
+    if (contract?.tools.some(tool => tool.name === name)) throw new Error(`Page tool ${name} has the name of a tool of ${own}.`);
+  }
+  const bind = binding => bindApps(identity, contracts, { [own]: binding })[own];
+  const { client, ...surface } = await open({ identity, own, endpoint, contract, tools, view, bind });
+  return Object.freeze({ ...client, ...surface });
+}
 
 // appClass returns the ext-apps App with the app's own tools and resources (contracts[own]) typed.
 // Calls go through the host that embeds the page, so connect the App first, as with any App.
@@ -20,26 +35,6 @@ export function appClass(identity, contracts, own) {
     get resources() { return this.#client.resources; }
     callTool(request, options) { return this.#client.callTool(request, options); }
   };
-}
-
-const hasFile = node => Array.isArray(node) ? node.some(hasFile) : typeof node === "object" && node !== null && ("x-mcp-file" in node || Object.values(node).some(hasFile));
-
-// An agent writes arguments as tokens, so it is not shown a file argument (x-mcp-file): an anyOf or oneOf branch that
-// holds one is left out, and a tool that still has one is not exposed.
-// https://github.com/modelcontextprotocol/experimental-ext-file-uploads/blob/main/specification/draft/file-uploads.md#file-arguments
-function withoutFiles(schema) {
-  const prune = node => {
-    if (Array.isArray(node)) return node.map(prune);
-    if (typeof node !== "object" || node === null) return node;
-    const pruned = Object.fromEntries(Object.entries(node).map(([key, value]) => [key, prune(value)]));
-    for (const key of ["anyOf", "oneOf"]) {
-      const kept = Array.isArray(pruned[key]) ? pruned[key].filter(branch => !hasFile(branch)) : [];
-      if (kept.length) pruned[key] = kept;
-    }
-    return pruned;
-  };
-  const pruned = hasFile(schema) ? prune(schema) : schema;
-  return hasFile(pruned) ? undefined : pruned;
 }
 
 export async function exposeTools(app, options = {}) {
