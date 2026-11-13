@@ -1,14 +1,15 @@
 import { test } from "node:test";
-import { copyFileSync, cpSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { fixture, temporary } from "./helpers.mjs";
 
 const repository = dirname(dirname(fileURLToPath(import.meta.url)));
 
 test("the packed package installs, loads on both surfaces, and type-checks generated clients", t => {
-  const root = temporary(t);
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "holon-ui-")));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
   const packed = execFileSync("npm", ["pack", "--ignore-scripts", "--json", "--pack-destination", root], {
     cwd: repository,
     encoding: "utf8",
@@ -32,8 +33,9 @@ test("the packed package installs, loads on both surfaces, and type-checks gener
     cwd: consumer,
     stdio: "inherit",
   });
-  cpSync(fixture("checkout"), join(consumer, "generated/holon-ui"), { recursive: true });
-  copyFileSync(fixture("consumer.ts"), join(consumer, "consumer.ts"));
+  const fixtures = join(repository, "tests/fixtures");
+  cpSync(join(fixtures, "checkout"), join(consumer, "generated/holon-ui"), { recursive: true });
+  copyFileSync(join(fixtures, "consumer.ts"), join(consumer, "consumer.ts"));
 
   // Both surfaces ship: the generated module loads as a web page's build and as a view's.
   const generated = JSON.stringify(pathToFileURL(join(consumer, "generated/holon-ui/index.mjs")).href);

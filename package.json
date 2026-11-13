@@ -23,7 +23,6 @@
     "runtime.d.ts",
     "runtime.host.mjs",
     "runtime.web.mjs",
-    "legacy.mjs",
     "README.md"
   ],
   "scripts": {
