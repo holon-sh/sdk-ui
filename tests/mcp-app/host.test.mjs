@@ -32,7 +32,6 @@ test("a view introduces itself as its app and calls the app through the host", a
   assert.deepEqual(bridge.getAppVersion(), { name: "example.com/checkout", version: "1.2.0" });
   assert.deepEqual(await app.tools.get_order({ id: "abc" }), { total: 3 });
   assert.deepEqual(await app.resources["orders://summary"].read(), { total: 1 });
-  await assert.rejects(app.listTools());
 });
 
 test("the host's agent lists the page's tools and gets each outcome as an MCP result", async t => {

@@ -46,10 +46,9 @@ export async function connect({ identity, contracts, own }, { tools = {}, view: 
   const client = bind({
     callTool: (request, { signal, timeout }) => app.callServerTool(request, { signal, timeout }),
     readResource: (request, { signal, timeout }) => app.readServerResource(request, { signal, timeout }),
-    listTools: async () => { throw new Error("An MCP Apps host owns the tool catalog, so a view cannot list tools."); },
   });
   // Closing the view removes its tools from the host.
-  return Object.freeze({ ...client, view: app, opened, close: () => app.close() });
+  return Object.freeze({ tools: client.tools, callTool: client.callTool, resources: client.resources, view: app, opened, close: () => app.close() });
 }
 
 function toolResult(value) {
