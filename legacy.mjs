@@ -8,13 +8,11 @@ import { bindApps, ToolCallError } from "holon-sh/runtime";
 export function appClass(identity, contracts, own) {
   return class extends App {
     constructor(info = { name: identity.name, version: identity.version }, ...rest) { super(info, ...rest); }
-    #client = bindApps(identity, { [own]: contracts[own] }, { [own]: {} }, {
-      session: () => ({
-        callTool: (request, { signal, timeout } = {}) => this.callServerTool(request, { signal, timeout }),
-        readResource: (request, { signal, timeout } = {}) => this.readServerResource(request, { signal, timeout }),
-        listTools: () => { throw new Error("The host owns the tool catalog; bind an endpoint to list tools."); },
-      }),
-    })[own];
+    #client = bindApps(identity, { [own]: contracts[own] }, { [own]: { session: {
+      callTool: (request, { signal, timeout } = {}) => this.callServerTool(request, { signal, timeout }),
+      readResource: (request, { signal, timeout } = {}) => this.readServerResource(request, { signal, timeout }),
+      listTools: () => { throw new Error("The host owns the tool catalog; bind an endpoint to list tools."); },
+    } } })[own];
     get tools() { return this.#client.tools; }
     get resources() { return this.#client.resources; }
     callTool(request, options) { return this.#client.callTool(request, options); }
