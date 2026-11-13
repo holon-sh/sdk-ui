@@ -45,12 +45,12 @@ test("the packed package installs, runs, and type-checks generated clients", asy
     "exec", "--offline", "--", "tsc", "--noEmit", "--strict",
     "--target", "es2023", "--types", "node", "consumer.ts",
   ];
-  execFileSync("npm", [...tsc, "--module", "esnext", "--moduleResolution", "bundler"], {
+  // Declarations are checked once, under NodeNext, which is the stricter about their imports.
+  execFileSync("npm", [...tsc, "--module", "esnext", "--moduleResolution", "bundler", "--skipLibCheck"], {
     cwd: consumer,
     stdio: "inherit",
   });
-  // Some supported MCP Apps versions use extensionless declaration imports.
-  execFileSync("npm", [...tsc, "--module", "nodenext", "--skipLibCheck"], {
+  execFileSync("npm", [...tsc, "--module", "nodenext"], {
     cwd: consumer,
     stdio: "inherit",
   });

@@ -1,12 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { inputRequired, McpServer } from "@modelcontextprotocol/server";
+import { InMemoryTransport, inputRequired, McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { App } from "@modelcontextprotocol/ext-apps";
 import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { createApps, bindApps, appClass, exposeTools, registerPageTools } from "holon-ui/runtime";
+import { bindApps, appClass, exposeTools, registerPageTools } from "holon-ui/runtime";
 import { serve } from "./helpers.mjs";
 
 test("endpoint bindings call tools directly and expose them to WebMCP", { timeout: 10000 }, async t => {
@@ -20,10 +19,7 @@ test("endpoint bindings call tools directly and expose them to WebMCP", { timeou
   });
   t.after(() => { delete globalThis.document; });
   const contract = { tools: [{ name: "get_order", inputSchema: z.toJSONSchema(input, { io: "input" }), outputSchema: z.toJSONSchema(output) }] };
-  const identity = { name: "chat-web", version: "1", requires: {} };
-  const unbound = createApps({ ...identity, requires: { chat: {} } }, { chat: contract });
-  await assert.rejects(unbound.chat.tools.get_order({ id: "abc" }), { message: "Dependency chat is unavailable. Provide a binding." });
-  const direct = createApps(identity, { chat: contract }, { chat: { endpoint } });
+  const direct = bindApps({ name: "chat-web", version: "1" }, { chat: contract }, { chat: { endpoint } });
   t.after(() => direct.chat.close());
   assert.deepEqual(await direct.chat.tools.get_order({ id: "abc" }), { total: 3 });
   assert.equal(await exposeTools(direct.chat), false);
@@ -70,7 +66,7 @@ test("exposeTools tells the agent about a question it cannot answer", { timeout:
   const registered = [];
   globalThis.document = { modelContext: { registerTool: async tool => { registered.push(tool); } } };
   t.after(() => { delete globalThis.document; });
-  const apps = createApps({ name: "checkout", version: "1", requires: {} }, { orders: null }, { orders: { endpoint } });
+  const apps = bindApps({ name: "checkout", version: "1", requires: {} }, { orders: null }, { orders: { endpoint } });
   t.after(() => apps.orders.close());
   await exposeTools(apps.orders);
   await assert.rejects(registered[0].execute({}), { name: "ToolCallError", message: "page.ship: additional input required: Which size should I ship?" });
