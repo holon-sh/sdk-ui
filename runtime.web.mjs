@@ -5,8 +5,6 @@ import { getDisplayName } from "@modelcontextprotocol/client";
 import { bindApps, ToolCallError } from "holon-sh/runtime";
 
 export { bindApps, ToolCallError };
-export { appClass, exposeTools, registerPageTools } from "./legacy.mjs";
-import { withoutFiles } from "./legacy.mjs";
 
 export async function connect({ identity, contracts, own, endpoint }, { tools = {} } = {}) {
   const client = bindApps(identity, contracts, { [own]: { endpoint: new URL(endpoint, location.origin) } })[own];
@@ -70,4 +68,24 @@ function serverTool(own, client, tool, inputSchema) {
 function hints(annotations) {
   const readOnlyHint = annotations?.readOnlyHint === true;
   return { readOnlyHint, consequentialHint: !readOnlyHint && annotations?.destructiveHint !== false, untrustedContentHint: annotations?.openWorldHint !== false };
+}
+
+const hasFile = node => Array.isArray(node) ? node.some(hasFile) : typeof node === "object" && node !== null && ("x-mcp-file" in node || Object.values(node).some(hasFile));
+
+// An agent writes arguments as tokens, so it is not shown a file argument (x-mcp-file): an anyOf or oneOf branch that
+// holds one is left out, and a tool that still has one is not exposed.
+// https://github.com/modelcontextprotocol/experimental-ext-file-uploads/blob/main/specification/draft/file-uploads.md#file-arguments
+function withoutFiles(schema) {
+  const prune = node => {
+    if (Array.isArray(node)) return node.map(prune);
+    if (typeof node !== "object" || node === null) return node;
+    const pruned = Object.fromEntries(Object.entries(node).map(([key, value]) => [key, prune(value)]));
+    for (const key of ["anyOf", "oneOf"]) {
+      const kept = Array.isArray(pruned[key]) ? pruned[key].filter(branch => !hasFile(branch)) : [];
+      if (kept.length) pruned[key] = kept;
+    }
+    return pruned;
+  };
+  const pruned = prune(schema);
+  return hasFile(pruned) ? undefined : pruned;
 }

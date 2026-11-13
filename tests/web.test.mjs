@@ -1,25 +1,42 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fromJsonSchema, inputRequired, McpServer } from "@modelcontextprotocol/server";
+import { createServer } from "node:http";
+import { once } from "node:events";
+import { createMcpHandler, fromJsonSchema, inputRequired, McpServer } from "@modelcontextprotocol/server";
+import { toNodeHandler } from "@modelcontextprotocol/node";
 import { z } from "zod";
 import { connect, ToolCallError } from "holon-ui/runtime";
-import { serve } from "./helpers.mjs";
 
 const identity = { name: "example.com/checkout", version: "1" };
 const order = { input: z.strictObject({ id: z.string() }), output: z.object({ total: z.number() }) };
 const empty = async () => ({ content: [] });
+
+// Serves an MCP server at /mcp on a local origin, and returns the origin.
+async function serve(t, factory) {
+  const handler = createMcpHandler(factory, { legacy: "reject" });
+  const dispatch = toNodeHandler(handler);
+  const http = createServer((req, res) => { void dispatch(req, res).catch(() => res.destroy()); });
+  t.after(async () => {
+    await handler.close();
+    http.closeAllConnections();
+    await new Promise(resolve => http.close(resolve));
+  });
+  http.listen(0, "127.0.0.1");
+  await once(http, "listening");
+  return `http://127.0.0.1:${http.address().port}`;
+}
 
 // Serves the page's own app at /mcp on the page's origin: get_order and tools, each [config, handler], all in the
 // page's contract as a generated one would have them, and what register adds outside it. With origin, the app is
 // somewhere the page cannot reach.
 async function page(t, tools = {}, { register = () => {}, origin } = {}) {
   const served = { get_order: [{ description: "Read one order", inputSchema: order.input, outputSchema: order.output, annotations: { readOnlyHint: true } }, async ({ id }) => ({ content: [{ type: "text", text: id }], structuredContent: { total: id.length } })], ...tools };
-  origin ??= new URL((await serve(t, () => {
+  origin ??= await serve(t, () => {
     const server = new McpServer({ name: "checkout", version: "1" });
     for (const [name, [config, handler]] of Object.entries(served)) server.registerTool(name, config, handler);
     register(server);
     return server;
-  })).endpoint).origin;
+  });
   globalThis.location = { origin };
   t.after(() => { delete globalThis.location; });
   const contract = { tools: Object.keys(served).map(name => ({ name, inputSchema: { type: "object" }, ...(name === "get_order" && { outputSchema: z.toJSONSchema(order.output) }) })) };

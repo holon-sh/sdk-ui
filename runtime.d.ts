@@ -41,15 +41,3 @@ export declare function connect<S extends Record<string, unknown> = {}>(
   app: { identity: Identity; contracts: Record<string, Contract | null>; own: string; /** The app's MCP endpoint on the page's origin, such as "/mcp/checkout". */ endpoint: string },
   options?: ConnectOptions<S>,
 ): Promise<Page<RuntimeClient>>;
-
-/** The ext-apps App with the app's own tools and resources typed; calls go through the host that embeds the page. */
-export type View = App & Pick<RuntimeClient, "tools" | "resources" | "callTool">;
-export declare function appClass(identity: Identity, contracts: Record<string, Contract | null>, own: string): new (info?: ConstructorParameters<typeof App>[0], ...rest: ConstructorParameters<typeof App> extends [unknown, ...infer Rest] ? Rest : never) => View;
-export interface ExposeOptions { signal?: AbortSignal; execute?: (name: string, args: Record<string, unknown>) => Promise<unknown> }
-export declare function exposeTools(app: Pick<RuntimeClient, "callTool" | "listTools">, options?: ExposeOptions): Promise<boolean>;
-export type PageResult<I> = { readonly value: I; readonly issues?: undefined } | { readonly issues: ReadonlyArray<{ readonly message: string }> };
-export interface PageSchema<I = unknown> { readonly "~standard": { readonly version: 1; readonly vendor: string; readonly types?: { readonly input: unknown; readonly output: I }; readonly validate: (value: unknown) => PageResult<I> | Promise<PageResult<I>>; readonly jsonSchema: { readonly input: (options: { target: "draft-2020-12" }) => object } } }
-export type PageInput<S> = S extends PageSchema<infer I> ? I : never;
-export interface PageAnnotations { title?: string; readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean; openWorldHint?: boolean }
-export interface PageHost { registerTool(name: string, config: { description: string; inputSchema: PageSchema; annotations?: PageAnnotations }, callback: (args: any, extra: any) => any): { remove(): void } }
-export declare function registerPageTools<S extends { [name: string]: PageSchema }>(tools: { [K in keyof S]: { description: string; inputSchema: S[K]; annotations?: PageAnnotations; execute: (args: PageInput<S[K]>) => unknown } }, options?: { view?: PageHost; signal?: AbortSignal }): Promise<boolean>;

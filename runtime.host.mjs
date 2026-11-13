@@ -6,7 +6,6 @@ import { App } from "@modelcontextprotocol/ext-apps";
 import { bindApps, ToolCallError } from "holon-sh/runtime";
 
 export { bindApps, ToolCallError };
-export { appClass, exposeTools, registerPageTools } from "./legacy.mjs";
 
 export async function connect({ identity, contracts, own }, { tools = {}, view: { transport, ...options } = {} } = {}) {
   const bind = session => bindApps(identity, contracts, { [own]: { session } })[own];

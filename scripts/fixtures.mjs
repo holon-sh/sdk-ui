@@ -1,6 +1,6 @@
 // The only fixture refresh path: HOLON=/path/to/holon npm run fixtures.
 // Uses public generation in a temporary browser project; no network is needed.
-// The project's own server shares the orders contract, so the clients also have its App class.
+// The project's own server shares the orders contract, so the clients also have its connect.
 // The project sits inside the repository so that every server loads the repository's MCP SDK.
 import { execFileSync } from "node:child_process";
 import { copyFileSync, cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
