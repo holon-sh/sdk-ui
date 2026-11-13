@@ -17,6 +17,7 @@ function install(root) {
   for (const name of ["runtime.mjs", "runtime.d.ts", "package.json"]) copyFileSync(join(repository, name), join(directory, name));
   symlinkSync(realpathSync(join(repository, "node_modules/holon-sh")), join(root, "node_modules/holon-sh"));
   symlinkSync(realpathSync(join(repository, "node_modules/@modelcontextprotocol")), join(root, "node_modules/@modelcontextprotocol"));
+  symlinkSync(realpathSync(join(repository, "node_modules/@types")), join(root, "node_modules/@types"));
 }
 
 test("ordinary NodeNext and Bundler compilation enforces browser bindings, page tools, and tool contracts", async t => {

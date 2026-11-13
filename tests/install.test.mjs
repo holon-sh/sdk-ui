@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { fixture, temporary, typecheck } from "./helpers.mjs";
 
 const repository = dirname(dirname(fileURLToPath(import.meta.url)));
+const manifest = JSON.parse(readFileSync(join(repository, "package.json"), "utf8"));
 
 function pack(directory, destination) {
   const packed = spawnSync("npm", ["pack", directory, "--ignore-scripts", "--json", "--pack-destination", destination], { cwd: repository, encoding: "utf8" });
@@ -22,7 +23,8 @@ test("the packed package installs with registry dependencies and runs the projec
   const consumer = join(root, "consumer");
   mkdirSync(consumer);
   const dependencies = { "holon-ui": `file:${join(root, info.filename)}` };
-  writeFileSync(join(consumer, "package.json"), JSON.stringify({ type: "module", private: true, imports: { "#holon-ui": "./generated/holon-ui/index.mjs" }, dependencies }));
+  const devDependencies = { "@types/node": manifest.devDependencies["@types/node"] };
+  writeFileSync(join(consumer, "package.json"), JSON.stringify({ type: "module", private: true, imports: { "#holon-ui": "./generated/holon-ui/index.mjs" }, dependencies, devDependencies }));
   const installed = spawnSync("npm", ["install", "--no-audit", "--no-fund", "--prefer-offline"], { cwd: consumer, encoding: "utf8" });
   assert.equal(installed.status, 0, installed.stderr);
   const metadata = JSON.parse(readFileSync(join(consumer, "node_modules/holon-ui/package.json"), "utf8"));
