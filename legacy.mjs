@@ -1,7 +1,6 @@
+// The page API that connect() replaces, kept until the CLI generates connect.
 import { App } from "@modelcontextprotocol/ext-apps";
 import { bindApps, ToolCallError } from "holon-sh/runtime";
-
-export { bindApps, ToolCallError };
 
 // appClass returns the ext-apps App with the app's own tools and resources (contracts[own]) typed.
 // Calls go through the host that embeds the page, so connect the App first, as with any App.
@@ -9,13 +8,11 @@ export { bindApps, ToolCallError };
 export function appClass(identity, contracts, own) {
   return class extends App {
     constructor(info = { name: identity.name, version: identity.version }, ...rest) { super(info, ...rest); }
-    #client = bindApps(identity, { [own]: contracts[own] }, { [own]: {} }, {
-      session: () => ({
-        callTool: (request, { signal, timeout } = {}) => this.callServerTool(request, { signal, timeout }),
-        readResource: (request, { signal, timeout } = {}) => this.readServerResource(request, { signal, timeout }),
-        listTools: () => { throw new Error("The host owns the tool catalog; bind an endpoint to list tools."); },
-      }),
-    })[own];
+    #client = bindApps(identity, { [own]: contracts[own] }, { [own]: { session: {
+      callTool: (request, { signal, timeout } = {}) => this.callServerTool(request, { signal, timeout }),
+      readResource: (request, { signal, timeout } = {}) => this.readServerResource(request, { signal, timeout }),
+      listTools: () => { throw new Error("The host owns the tool catalog; bind an endpoint to list tools."); },
+    } } })[own];
     get tools() { return this.#client.tools; }
     get resources() { return this.#client.resources; }
     callTool(request, options) { return this.#client.callTool(request, options); }
@@ -27,7 +24,7 @@ const hasFile = node => Array.isArray(node) ? node.some(hasFile) : typeof node =
 // An agent writes arguments as tokens, so it is not shown a file argument (x-mcp-file): an anyOf or oneOf branch that
 // holds one is left out, and a tool that still has one is not exposed.
 // https://github.com/modelcontextprotocol/experimental-ext-file-uploads/blob/main/specification/draft/file-uploads.md#file-arguments
-function withoutFiles(schema) {
+export function withoutFiles(schema) {
   const prune = node => {
     if (Array.isArray(node)) return node.map(prune);
     if (typeof node !== "object" || node === null) return node;
