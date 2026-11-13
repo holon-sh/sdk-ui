@@ -5,7 +5,6 @@ export type { AuthProvider, CallOptions, CallMetadata, ToolResult, ToolClient } 
 export { ToolCallError } from "holon-sh/runtime";
 
 export interface CreateOptions { validator?: (schema: object) => (value: unknown) => boolean }
-export declare function createApps(identity: Identity, contracts: Record<string, Contract | null>, bindings?: Record<string, EndpointBinding>, options?: CreateOptions): Readonly<Record<string, RuntimeClient>>;
 export declare function bindApps(identity: Identity, contracts: Record<string, Contract | null>, bindings: Record<string, EndpointBinding>, options?: CreateOptions): Readonly<Record<string, RuntimeClient>>;
 /** The ext-apps App with the app's own tools and resources typed; calls go through the host that embeds the page. */
 export type View = App & Pick<RuntimeClient, "tools" | "resources" | "callTool">;

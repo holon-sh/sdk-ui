@@ -1,14 +1,7 @@
 import { App } from "@modelcontextprotocol/ext-apps";
-import { createApps as create, bindApps, ToolCallError } from "holon-sh/runtime";
+import { bindApps, ToolCallError } from "holon-sh/runtime";
 
-export { ToolCallError };
-
-export { bindApps };
-
-// Browser clients have no process environment or host-wide default binding.
-export function createApps(identity, contracts, bindings, options) {
-  return create(identity, contracts, bindings, { ...options, resolve: () => undefined });
-}
+export { bindApps, ToolCallError };
 
 // appClass returns the ext-apps App with the app's own tools and resources (contracts[own]) typed.
 // Calls go through the host that embeds the page, so connect the App first, as with any App.
