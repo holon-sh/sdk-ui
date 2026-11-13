@@ -23,7 +23,7 @@ export async function connect({ identity, contracts, own }, { tools = {}, view: 
       }
     };
     // ext-apps validates input against inputSchema first, and calls a tool without one with the request context alone.
-    app.registerTool(name, { title: annotations?.title, description, inputSchema, annotations }, inputSchema ? run : extra => run({}, extra));
+    app.registerTool(name, { description, inputSchema, annotations }, inputSchema ? run : extra => run({}, extra));
   }
   // The host sends the call that opened the view once, right after the handshake, so listen before connecting.
   // https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx#data-passing
@@ -40,7 +40,7 @@ export async function connect({ identity, contracts, own }, { tools = {}, view: 
   const opened = delivered.then(async ({ input, result }) => {
     const tool = app.getHostContext()?.toolInfo?.tool.name;
     const replay = tool && bind({ callTool: async () => result }).tools[tool];
-    return replay ? { tool, input, output: await replay(input) } : { tool: undefined, input, output: result.structuredContent ?? result };
+    return replay ? { tool, input, output: await replay(input) } : { tool: undefined, input, output: result };
   });
   // A page that never reads opened must not see an unhandled rejection.
   opened.catch(() => {});

@@ -45,11 +45,7 @@ test("the packed package installs, loads on both surfaces, and type-checks gener
     "exec", "--offline", "--", "tsc", "--noEmit", "--strict",
     "--target", "es2023", "--types", "node", "consumer.ts",
   ];
-  // Declarations are checked once, under NodeNext, which is the stricter about their imports.
-  execFileSync("npm", [...tsc, "--module", "esnext", "--moduleResolution", "bundler", "--skipLibCheck"], {
-    cwd: consumer,
-    stdio: "inherit",
-  });
+  // NodeNext is the stricter resolution, and checking the declarations too covers what a bundler would see.
   execFileSync("npm", [...tsc, "--module", "nodenext"], {
     cwd: consumer,
     stdio: "inherit",

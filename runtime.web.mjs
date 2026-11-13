@@ -16,10 +16,19 @@ export async function connect({ identity, contracts, own, endpoint }, { tools = 
   // Aborting the lifetime unregisters every tool. https://webmachinelearning.github.io/webmcp/#dom-modelcontext-registertool
   if (context) {
     const { signal } = lifetime;
-    const offer = tool => tool && context.registerTool(tool, { signal }).catch(error => console.warn(`WebMCP did not accept the tool ${tool.name}:`, error));
+    const offer = tool => context.registerTool(tool, { signal }).catch(error => console.warn(`WebMCP did not accept the tool ${tool.name}:`, error));
     for (const [name, tool] of Object.entries(tools)) offer(pageTool(name, tool));
+    const contracted = name => !contracts[own] || contracts[own].tools.some(tool => tool.name === name);
     client.listTools({ signal }).then(
-      ({ tools: listed }) => { for (const tool of listed) offer(serverTool(own, contracts[own], client, tool)); },
+      ({ tools: listed }) => {
+        for (const tool of listed) {
+          // MCP Apps: a tool whose visibility omits "model" must not reach the agent; absent means ["model", "app"].
+          // https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx#resource-discovery
+          // A typed client calls only its contract's tools, and an agent cannot write a file argument.
+          const inputSchema = withoutFiles(tool.inputSchema);
+          if ((tool._meta?.ui?.visibility ?? ["model"]).includes("model") && contracted(tool.name) && inputSchema) offer(serverTool(own, client, tool, inputSchema));
+        }
+      },
       error => signal.aborted || console.warn(`Could not list the tools of ${own} for WebMCP:`, error),
     );
   }
@@ -33,28 +42,20 @@ function pageTool(name, { description, inputSchema, annotations, execute }) {
     inputSchema: standard?.jsonSchema.input({ target: "draft-2020-12" }),
     execute: async (input, { signal }) => {
       if (!standard) return execute({}, { signal });
-      const parsed = await standard.validate(input ?? {});
+      const parsed = await standard.validate(input);
       if (parsed.issues) throw new Error(`Invalid arguments for ${name}: ${JSON.stringify(parsed.issues)}`);
       return execute(parsed.value, { signal });
     },
   };
 }
 
-// The app's tool as WebMCP takes it, or nothing for a tool the agent must not or cannot call.
-function serverTool(own, contract, client, tool) {
-  // MCP Apps: a tool whose visibility omits "model" must not reach the agent; absent means ["model", "app"].
-  // https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx#resource-discovery
-  if (!(tool._meta?.ui?.visibility ?? ["model"]).includes("model")) return;
-  // A typed client calls only its contract's tools.
-  if (contract && !contract.tools.some(({ name }) => name === tool.name)) return;
-  const inputSchema = withoutFiles(tool.inputSchema);
-  if (!inputSchema) return;
+function serverTool(own, client, tool, inputSchema) {
   return {
     // MCP lets a tool go without a description; WebMCP requires one.
     name: tool.name, title: tool.title ?? tool.annotations?.title, description: tool.description || getDisplayName(tool),
     inputSchema, outputSchema: tool.outputSchema, annotations: hints(tool.annotations),
     execute: async (input, { signal }) => {
-      const result = await client.callTool({ name: tool.name, arguments: input ?? {} }, { signal });
+      const result = await client.callTool({ name: tool.name, arguments: input }, { signal });
       // An agent can only supply arguments, so it cannot answer a question the server asks back.
       if (result.resultType === "input_required" || result.isError) throw new ToolCallError(own, tool.name, result);
       return result.structuredContent ?? result.content;

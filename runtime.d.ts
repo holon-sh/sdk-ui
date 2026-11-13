@@ -1,9 +1,9 @@
 import type { App, AppOptions } from "@modelcontextprotocol/ext-apps";
 import type { StandardSchemaV1, StandardSchemaWithJSON, ToolAnnotations, Transport } from "@modelcontextprotocol/client";
 import type { EndpointBinding, Identity, Contract, RuntimeClient } from "holon-sh/runtime";
-export type { EndpointBinding, Identity, Contract, RuntimeClient } from "holon-sh/runtime";
+export type { CreateOptions, EndpointBinding, Identity, Contract, RuntimeClient } from "holon-sh/runtime";
 export type { AuthProvider, CallOptions, CallMetadata, ToolResult, ToolClient } from "holon-sh/runtime";
-export { ToolCallError } from "holon-sh/runtime";
+export { bindApps, ToolCallError } from "holon-sh/runtime";
 
 /** A tool the page declares. It runs in the browser and acts on what the person is looking at. S is its input schema's type. */
 export interface PageTool<S = undefined> {
@@ -42,8 +42,6 @@ export declare function connect<S extends Record<string, unknown> = {}>(
   options?: ConnectOptions<S>,
 ): Promise<Page<RuntimeClient>>;
 
-export interface CreateOptions { validator?: (schema: object) => (value: unknown) => boolean }
-export declare function bindApps(identity: Identity, contracts: Record<string, Contract | null>, bindings: Record<string, EndpointBinding>, options?: CreateOptions): Readonly<Record<string, RuntimeClient>>;
 /** The ext-apps App with the app's own tools and resources typed; calls go through the host that embeds the page. */
 export type View = App & Pick<RuntimeClient, "tools" | "resources" | "callTool">;
 export declare function appClass(identity: Identity, contracts: Record<string, Contract | null>, own: string): new (info?: ConstructorParameters<typeof App>[0], ...rest: ConstructorParameters<typeof App> extends [unknown, ...infer Rest] ? Rest : never) => View;

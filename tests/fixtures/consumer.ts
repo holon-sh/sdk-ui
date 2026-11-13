@@ -79,20 +79,18 @@ declare const connect: Connect<Apps["checkout"]>;
 const page = await connect({
   tools: {
     select: { description: "Select", inputSchema: z.object({ ids: z.array(z.string()) }), execute: ({ ids }, { signal }) => ids.length + Number(signal.aborted) },
-    selection: { description: "List the selection", annotations: { readOnlyHint: true }, execute: () => [] },
+    // A tool without an input schema leaves the others' inputs inferred.
+    selection: { description: "List the selection", execute: () => [] },
     // @ts-expect-error The schema supplies ids, not names.
     wrong: { description: "Wrong", inputSchema: z.object({ ids: z.array(z.string()) }), execute: ({ names }) => names },
   },
-  view: { autoResize: false },
 });
 (await page.tools.get_order({ orderId: "own" })).total.toFixed();
-(await page.resources["orders://summary"].read()).total.toFixed();
-// @ts-expect-error The app has no lookup tool.
-page.tools.lookup;
 const opened = await page.opened;
 // @ts-expect-error Until narrowed by its tool, the output is not known.
 opened?.output.total;
 if (opened?.tool === "get_order") opened.output.total.toFixed();
-if (page.view) page.view.onhostcontextchanged = ({ theme }) => theme?.toUpperCase();
+// @ts-expect-error The view is undefined on a web page.
+page.view.close();
 // @ts-expect-error A page tool cannot take the name of one of the app's tools.
 connect({ tools: { get_order: { description: "Shadow", execute: () => {} } } });

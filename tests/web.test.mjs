@@ -1,28 +1,28 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fromJsonSchema, inputRequired, McpServer } from "@modelcontextprotocol/server";
-import { registerAppTool } from "@modelcontextprotocol/ext-apps/server";
 import { z } from "zod";
-import { connect } from "holon-ui/runtime";
+import { connect, ToolCallError } from "holon-ui/runtime";
 import { serve } from "./helpers.mjs";
 
 const identity = { name: "example.com/checkout", version: "1" };
 const order = { input: z.strictObject({ id: z.string() }), output: z.object({ total: z.number() }) };
-const getOrder = { name: "get_order", inputSchema: z.toJSONSchema(order.input, { io: "input" }), outputSchema: z.toJSONSchema(order.output) };
+const empty = async () => ({ content: [] });
 
-// Serves the page's own app at /mcp on the page's origin, with get_order and what register adds. Like a generated
-// contract, the page's names the server's tools: get_order and those in contracted.
-async function page(t, register = () => {}, contracted = []) {
-  const { endpoint } = await serve(t, () => {
+// Serves the page's own app at /mcp on the page's origin: get_order and tools, each [config, handler], all in the
+// page's contract as a generated one would have them, and what register adds outside it. With origin, the app is
+// somewhere the page cannot reach.
+async function page(t, tools = {}, { register = () => {}, origin } = {}) {
+  const served = { get_order: [{ description: "Read one order", inputSchema: order.input, outputSchema: order.output, annotations: { readOnlyHint: true } }, async ({ id }) => ({ content: [{ type: "text", text: id }], structuredContent: { total: id.length } })], ...tools };
+  origin ??= new URL((await serve(t, () => {
     const server = new McpServer({ name: "checkout", version: "1" });
-    server.registerTool("get_order", { description: "Read one order", inputSchema: order.input, outputSchema: order.output, annotations: { readOnlyHint: true } }, async ({ id }) =>
-      ({ content: [{ type: "text", text: id }], structuredContent: { total: id.length } }));
+    for (const [name, [config, handler]] of Object.entries(served)) server.registerTool(name, config, handler);
     register(server);
     return server;
-  });
-  globalThis.location = { origin: new URL(endpoint).origin };
-  t.after(() => { delete globalThis.location; delete globalThis.document; });
-  const contract = { tools: [getOrder, ...contracted.map(name => ({ name, inputSchema: { type: "object" } }))] };
+  })).endpoint).origin;
+  globalThis.location = { origin };
+  t.after(() => { delete globalThis.location; });
+  const contract = { tools: Object.keys(served).map(name => ({ name, inputSchema: { type: "object" }, ...(name === "get_order" && { outputSchema: z.toJSONSchema(order.output) }) })) };
   return async options => {
     const app = await connect({ identity, contracts: { checkout: contract }, own: "checkout", endpoint: "/mcp" }, options);
     t.after(() => app.close());
@@ -30,9 +30,9 @@ async function page(t, register = () => {}, contracted = []) {
   };
 }
 
-// The browser's WebMCP, which rejects the tools reject names. Offering runs after connect() resolves, so a test waits
-// for the tools it expects.
-function modelContext(reject = () => false) {
+// The browser's WebMCP, rejecting the tools reject picks. Offering runs after connect() resolves, so a test waits for
+// the tools it expects.
+function modelContext(t, reject = () => false) {
   const registered = new Map();
   let arrived = () => {};
   globalThis.document = { modelContext: { registerTool: async (tool, options) => {
@@ -40,17 +40,11 @@ function modelContext(reject = () => false) {
     registered.set(tool.name, { tool, options });
     arrived();
   } } };
+  t.after(() => { delete globalThis.document; });
   const until = async (...names) => {
     while (!names.every(name => registered.has(name))) await new Promise(resolve => { arrived = resolve; });
   };
   return { registered, until };
-}
-
-function warnings(t) {
-  const messages = [];
-  let warned;
-  t.mock.method(console, "warn", message => { messages.push(message); warned(); });
-  return { messages, next: () => new Promise(resolve => { warned = resolve; }) };
 }
 
 test("a web page calls its own app over HTTP", async t => {
@@ -61,31 +55,32 @@ test("a web page calls its own app over HTTP", async t => {
 });
 
 test("a web page offers its own tools and the app's model-visible tools to WebMCP until it closes", async t => {
-  const connect = await page(t, server => {
-    server.registerTool("unannotated", { title: "Unannotated" }, async () => ({ content: [] }));
-    server.registerTool("safe", { annotations: { title: "Safe", destructiveHint: false, openWorldHint: false } }, async () => ({ content: [] }));
-    server.registerTool("uncontracted", { description: "Added after the contract was generated" }, async () => ({ content: [] }));
-    for (const [name, visibility] of [["both", ["model", "app"]], ["view_only", ["app"]], ["nobody", []]]) registerAppTool(server, name, { description: name, _meta: { ui: { visibility } } }, async () => ({ content: [] }));
-  }, ["unannotated", "safe", "both", "view_only", "nobody"]);
-  const { registered, until } = modelContext();
+  const connect = await page(t, {
+    unannotated: [{ title: "Unannotated" }, empty],
+    safe: [{ annotations: { title: "Safe", destructiveHint: false, openWorldHint: false } }, empty],
+    both: [{ description: "Both", _meta: { ui: { visibility: ["model", "app"] } } }, empty],
+    view_only: [{ description: "View only", _meta: { ui: { visibility: ["app"] } } }, empty],
+    nobody: [{ description: "Nobody", _meta: { ui: { visibility: [] } } }, empty],
+  }, { register: server => server.registerTool("uncontracted", { description: "Added after the contract was generated" }, empty) });
+  const { registered, until } = modelContext(t);
   const app = await connect({ tools: {
     select: { description: "Select shapes", inputSchema: z.object({ ids: z.array(z.string()) }), annotations: { title: "Select", openWorldHint: false }, execute: () => ({}) },
     selection: { description: "List selected shapes", annotations: { readOnlyHint: true }, execute: () => ({}) },
   } });
-  await until("get_order", "unannotated", "safe", "both");
-  assert.deepEqual([...registered.keys()].sort(), ["both", "get_order", "safe", "select", "selection", "unannotated"]);
-
-  const fields = name => {
-    const { title, description, inputSchema, outputSchema, annotations } = registered.get(name).tool;
-    return { title, description, input: Object.keys(inputSchema?.properties ?? {}), output: Boolean(outputSchema), annotations };
-  };
-  // MCP's hints read with their own defaults, then translated: unannotated means consequential and untrusted.
+  // MCP's hints read with their own defaults, then translated: unannotated means consequential and untrusted. A tool
+  // without a description is described by its title.
   const hints = (readOnlyHint, consequentialHint, untrustedContentHint) => ({ readOnlyHint, consequentialHint, untrustedContentHint });
-  assert.deepEqual(fields("get_order"), { title: undefined, description: "Read one order", input: ["id"], output: true, annotations: hints(true, false, true) });
-  assert.deepEqual(fields("unannotated"), { title: "Unannotated", description: "Unannotated", input: [], output: false, annotations: hints(false, true, true) });
-  assert.deepEqual(fields("safe"), { title: "Safe", description: "Safe", input: [], output: false, annotations: hints(false, false, false) });
-  assert.deepEqual(fields("select"), { title: "Select", description: "Select shapes", input: ["ids"], output: false, annotations: hints(false, true, false) });
-  assert.deepEqual(fields("selection"), { title: undefined, description: "List selected shapes", input: [], output: false, annotations: hints(true, false, true) });
+  const offered = {
+    get_order: { title: undefined, description: "Read one order", input: ["id"], output: true, annotations: hints(true, false, true) },
+    unannotated: { title: "Unannotated", description: "Unannotated", input: [], output: false, annotations: hints(false, true, true) },
+    safe: { title: "Safe", description: "Safe", input: [], output: false, annotations: hints(false, false, false) },
+    both: { title: undefined, description: "Both", input: [], output: false, annotations: hints(false, true, true) },
+    select: { title: "Select", description: "Select shapes", input: ["ids"], output: false, annotations: hints(false, true, false) },
+    selection: { title: undefined, description: "List selected shapes", input: [], output: false, annotations: hints(true, false, true) },
+  };
+  await until(...Object.keys(offered));
+  const fields = ({ title, description, inputSchema, outputSchema, annotations }) => ({ title, description, input: Object.keys(inputSchema?.properties ?? {}), output: Boolean(outputSchema), annotations });
+  assert.deepEqual(Object.fromEntries([...registered].map(([name, { tool }]) => [name, fields(tool)])), offered);
 
   await app.close();
   assert.ok([...registered.values()].every(({ options }) => options.signal.aborted));
@@ -98,10 +93,8 @@ test("an agent is not shown file arguments, which it cannot write", async t => {
     linked: { type: "object", properties: { file: { $ref: "#/$defs/file" } }, $defs: { file } },
     source: { type: "object", properties: { source: { anyOf: [{ type: "string" }, { type: "array", items: file }] } } },
   };
-  const connect = await page(t, server => {
-    for (const [name, inputSchema] of Object.entries(schemas)) server.registerTool(name, { description: name, inputSchema: fromJsonSchema(inputSchema) }, async () => ({ content: [] }));
-  }, Object.keys(schemas));
-  const { registered, until } = modelContext();
+  const connect = await page(t, Object.fromEntries(Object.entries(schemas).map(([name, schema]) => [name, [{ description: name, inputSchema: fromJsonSchema(schema) }, empty]])));
+  const { registered, until } = modelContext(t);
   await connect();
   await until("get_order", "source");
   assert.deepEqual([...registered.keys()].sort(), ["get_order", "source"]);
@@ -109,40 +102,34 @@ test("an agent is not shown file arguments, which it cannot write", async t => {
 });
 
 test("an agent's call to an app tool returns its output, fails as the tool did, and stops when cancelled", async t => {
-  let started, aborted;
-  const cancelled = new Promise(resolve => { aborted = resolve; });
-  const connect = await page(t, server => {
-    server.registerTool("text_only", {}, async () => ({ content: [{ type: "text", text: "plain" }] }));
-    server.registerTool("broken", {}, async () => ({ isError: true, content: [{ type: "text", text: "out of stock" }] }));
-    server.registerTool("ship", {}, async () => inputRequired({ inputRequests: {
-      size: inputRequired.elicit({ message: "Which size should I ship?", requestedSchema: z.object({ size: z.string() }) }),
-    } }));
-    server.registerTool("slow", {}, ({ mcpReq: { signal } }) => new Promise(resolve => {
-      started();
-      signal.addEventListener("abort", () => { aborted(); resolve({ content: [] }); });
-    }));
-  }, ["text_only", "broken", "ship", "slow"]);
-  const { registered, until } = modelContext();
+  let started;
+  const connect = await page(t, {
+    text_only: [{}, async () => ({ content: [{ type: "text", text: "plain" }] })],
+    broken: [{}, async () => ({ isError: true, content: [{ type: "text", text: "out of stock" }] })],
+    // An agent can only supply arguments, so it cannot answer a question the server asks back.
+    ship: [{}, async () => inputRequired({ inputRequests: { size: inputRequired.elicit({ message: "Which size?", requestedSchema: z.object({ size: z.string() }) }) } })],
+    slow: [{}, ({ mcpReq: { signal } }) => new Promise(resolve => { started(); signal.addEventListener("abort", () => resolve({ content: [] })); })],
+  });
+  const { registered, until } = modelContext(t);
   await connect();
   await until("get_order", "text_only", "broken", "ship", "slow");
-  const execute = (name, input, signal = new AbortController().signal) => registered.get(name).tool.execute(input, { signal });
+  const execute = (name, input = {}, signal = new AbortController().signal) => registered.get(name).tool.execute(input, { signal });
 
   assert.deepEqual(await execute("get_order", { id: "abcd" }), { total: 4 });
-  assert.deepEqual(await execute("text_only", undefined), [{ type: "text", text: "plain" }]);
-  // An agent can only supply arguments, so a question the server asks back fails the call too.
-  for (const name of ["broken", "ship"]) await assert.rejects(execute(name, {}), { name: "ToolCallError" }, name);
+  assert.deepEqual(await execute("text_only"), [{ type: "text", text: "plain" }]);
+  for (const name of ["broken", "ship"]) await assert.rejects(execute(name), ToolCallError, name);
 
   const cancel = new AbortController();
+  const begun = new Promise(resolve => { started = resolve; });
   const slow = execute("slow", {}, cancel.signal);
-  await new Promise(resolve => { started = resolve; });
-  const rejected = assert.rejects(slow);
+  await begun;
   cancel.abort();
-  await Promise.all([cancelled, rejected]);
+  await assert.rejects(slow);
 });
 
 test("an agent's call to a page tool runs it with validated input and the agent's signal", async t => {
   const connect = await page(t);
-  const { registered } = modelContext();
+  const { registered } = modelContext(t);
   const calls = [];
   await connect({ tools: {
     move: { description: "Move", inputSchema: z.object({ x: z.number().max(1) }), execute: (input, { signal }) => { calls.push([input, signal]); return { moved: input.x }; } },
@@ -155,26 +142,20 @@ test("an agent's call to a page tool runs it with validated input and the agent'
   assert.deepEqual(calls, [[{ x: 1 }, signal], [{}, signal]]);
 });
 
-test("a tool WebMCP rejects is reported, and the others are still offered", async t => {
-  const connect = await page(t, server => server.registerTool("second", { description: "Second" }, async () => ({ content: [] })), ["second"]);
-  const { registered, until } = modelContext(tool => tool.name === "get_order");
-  const { messages, next } = warnings(t);
-  const warned = next();
-  await connect({ tools: { local: { description: "Local", execute: () => {} } } });
-  await Promise.all([warned, until("local", "second")]);
-  assert.match(messages[0], /get_order/);
-  assert.deepEqual([...registered.keys()].sort(), ["local", "second"]);
-});
-
-test("an app that cannot be listed is reported, and the page's own tools are still offered", async t => {
-  const { registered } = modelContext();
-  globalThis.location = { origin: "http://127.0.0.1:1" };
-  t.after(() => { delete globalThis.location; delete globalThis.document; });
-  const { messages, next } = warnings(t);
-  const warned = next();
-  const app = await connect({ identity, contracts: { checkout: { tools: [getOrder] } }, own: "checkout", endpoint: "/mcp" }, { tools: { local: { description: "Local", execute: () => {} } } });
-  t.after(() => app.close());
-  await warned;
-  assert.equal(messages.length, 1);
-  assert.deepEqual([...registered.keys()], ["local"]);
+test("a failure to offer a tool is reported once, and the others are still offered", async t => {
+  let warned;
+  const warnings = t.mock.method(console, "warn", () => warned());
+  for (const { failure, origin, reject = () => false, offered } of [
+    { failure: "WebMCP rejects a tool", reject: tool => tool.name === "get_order", offered: ["local", "second"] },
+    { failure: "the app cannot be listed", origin: "http://127.0.0.1:1", offered: ["local"] },
+  ]) {
+    warnings.mock.resetCalls();
+    const reported = new Promise(resolve => { warned = resolve; });
+    const connect = await page(t, { second: [{ description: "Second" }, empty] }, { origin });
+    const { registered, until } = modelContext(t, reject);
+    await connect({ tools: { local: { description: "Local", execute: () => {} } } });
+    await Promise.all([reported, until(...offered)]);
+    assert.equal(warnings.mock.callCount(), 1, failure);
+    assert.deepEqual([...registered.keys()].sort(), offered, failure);
+  }
 });

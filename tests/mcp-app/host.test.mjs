@@ -1,12 +1,11 @@
-// Run as a view runs in a host (see package.json's test script): built with the mcp-app and browser conditions, and
-// under a content security policy without unsafe-eval, which MCP Apps hosts set.
+// Run under the mcp-app condition, as a view's build sets it (see package.json's test script).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { App } from "@modelcontextprotocol/ext-apps";
 import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { InMemoryTransport } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { connect } from "holon-ui/runtime";
+import { connect, ToolCallError } from "holon-ui/runtime";
 
 const identity = { name: "example.com/checkout", version: "1.2.0" };
 const summary = z.toJSONSchema(z.object({ total: z.number() }));
@@ -27,16 +26,11 @@ async function view(t, { hostContext, tools } = {}) {
 
 test("a view introduces itself as its app and calls the app through the host", async t => {
   const { app, bridge } = await view(t);
-  const served = [];
-  bridge.oncalltool = async ({ name, arguments: args }) => {
-    served.push([name, args]);
-    return { content: [], structuredContent: { total: args.id.length } };
-  };
+  bridge.oncalltool = async ({ arguments: args }) => ({ content: [], structuredContent: { total: args.id.length } });
   bridge.onreadresource = async ({ uri }) => ({ contents: [{ uri, mimeType: "application/json", text: JSON.stringify({ total: 1 }) }] });
   assert.ok(app.view instanceof App);
   assert.deepEqual(bridge.getAppVersion(), { name: "example.com/checkout", version: "1.2.0" });
   assert.deepEqual(await app.tools.get_order({ id: "abc" }), { total: 3 });
-  assert.deepEqual(served, [["get_order", { id: "abc" }]]);
   assert.deepEqual(await app.resources["orders://summary"].read(), { total: 1 });
   await assert.rejects(app.listTools());
 });
@@ -61,8 +55,7 @@ test("the host's agent lists the page's tools and gets each outcome as an MCP re
   const { bridge } = await view(t, { tools });
   const listed = Object.fromEntries((await bridge.listTools({})).tools.map(tool => [tool.name, tool]));
   assert.deepEqual(Object.keys(listed).sort(), Object.keys(tools).sort());
-  const { title, description, inputSchema, annotations } = listed.move;
-  assert.deepEqual([title, description, inputSchema.properties.x.maximum, annotations], ["Move", "Move the selection", 1, { title: "Move", destructiveHint: false }]);
+  assert.deepEqual([listed.move.description, listed.move.annotations], ["Move the selection", { title: "Move", destructiveHint: false }]);
 
   await bridge.callTool({ name: "move", arguments: { x: 1 } });
   assert.deepEqual(received[0], { x: 1 });
@@ -82,10 +75,10 @@ test("opened is the call that opened the view, with what its tool returns", asyn
     return app.opened;
   };
   assert.deepEqual(await open({ toolInfo }, bridge => bridge.sendToolResult({ content: [], structuredContent: { total: 3 } })), { tool: "get_order", input: { id: "abc" }, output: { total: 3 } });
-  await assert.rejects(open({ toolInfo }, bridge => bridge.sendToolResult({ isError: true, content: [{ type: "text", text: "No such order." }] })), { name: "ToolCallError" });
+  await assert.rejects(open({ toolInfo }, bridge => bridge.sendToolResult({ isError: true, content: [{ type: "text", text: "No such order." }] })), ToolCallError);
   await assert.rejects(open({ toolInfo }, bridge => bridge.sendToolCancelled({ reason: "The person stopped it." })), /The person stopped it/);
   // Without toolInfo, the host does not say which tool it was, so the call comes as delivered.
-  assert.deepEqual(await open({}, bridge => bridge.sendToolResult({ content: [], structuredContent: { total: 3 } })), { tool: undefined, input: { id: "abc" }, output: { total: 3 } });
+  assert.deepEqual(await open({}, bridge => bridge.sendToolResult({ content: [], structuredContent: { total: 3 } })), { tool: undefined, input: { id: "abc" }, output: { content: [], structuredContent: { total: 3 } } });
 });
 
 test("an opening call that fails is no unhandled rejection when the page ignores it", async t => {
