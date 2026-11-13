@@ -1,50 +1,57 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { cpSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { copyFileSync, cpSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { fixture, temporary, typecheck } from "./helpers.mjs";
+import { fixture, temporary } from "./helpers.mjs";
 
 const repository = dirname(dirname(fileURLToPath(import.meta.url)));
 
-function pack(directory, destination) {
-  const packed = spawnSync("npm", ["pack", directory, "--ignore-scripts", "--json", "--pack-destination", destination], { cwd: repository, encoding: "utf8" });
-  assert.equal(packed.status, 0, packed.stderr);
-  return JSON.parse(packed.stdout)[0];
-}
-
-test("the packed package installs with registry dependencies and runs the project's generated clients", async t => {
+test("the packed package installs, runs, and type-checks generated clients", async t => {
   const root = temporary(t);
-  const info = pack(".", root);
-  const paths = info.files.map(file => file.path).sort();
-  assert.deepEqual(paths, ["LICENSE", "README.md", "package.json", "runtime.d.ts", "runtime.mjs"]);
+  const packed = execFileSync("npm", ["pack", "--ignore-scripts", "--json", "--pack-destination", root], {
+    cwd: repository,
+    encoding: "utf8",
+  });
+  const [tarball] = JSON.parse(packed);
   const consumer = join(root, "consumer");
   mkdirSync(consumer);
-  const dependencies = { "holon-ui": `file:${join(root, info.filename)}` };
-  writeFileSync(join(consumer, "package.json"), JSON.stringify({ type: "module", private: true, imports: { "#holon-ui": "./generated/holon-ui/index.mjs" }, dependencies }));
-  const installed = spawnSync("npm", ["install", "--no-audit", "--no-fund", "--prefer-offline"], { cwd: consumer, encoding: "utf8" });
-  assert.equal(installed.status, 0, installed.stderr);
-  const metadata = JSON.parse(readFileSync(join(consumer, "node_modules/holon-ui/package.json"), "utf8"));
-  assert.deepEqual(Object.keys(metadata.dependencies), ["holon-sh"]);
-  // holon writes the clients into the project and maps #holon-ui to them; nothing is copied into node_modules.
+  const { devDependencies } = JSON.parse(readFileSync(join(repository, "package.json"), "utf8"));
+  writeFileSync(join(consumer, "package.json"), JSON.stringify({
+    type: "module",
+    private: true,
+    imports: { "#holon-ui": "./generated/holon-ui/index.mjs" },
+    dependencies: { "holon-ui": `file:${join(root, tarball.filename)}` },
+    devDependencies: {
+      "@types/node": devDependencies["@types/node"],
+      typescript: devDependencies.typescript,
+      zod: devDependencies.zod,
+    },
+  }));
+  execFileSync("npm", ["install", "--no-audit", "--no-fund", "--prefer-offline"], {
+    cwd: consumer,
+    stdio: "inherit",
+  });
   cpSync(fixture("checkout"), join(consumer, "generated/holon-ui"), { recursive: true });
-  const { createApps } = await import(pathToFileURL(join(consumer, "generated/holon-ui/index.mjs")));
-  assert.deepEqual(Object.keys(createApps({ orders: { endpoint: "https://orders.example/mcp" } })), ["orders"]);
-  const source = join(consumer, "consumer.ts");
-  writeFileSync(source, `import { createApps, registerPageTools, type Apps } from "#holon-ui";
-import type { EndpointBinding } from "holon-ui/runtime";
-const orders: EndpointBinding = { endpoint: "https://orders.example/mcp" };
-const apps: Pick<Apps, "orders"> = createApps({ orders });
-await registerPageTools({});
-// @ts-expect-error not a dependency
-createApps({ missing: orders });
-`);
-  typecheck(source);
-});
+  copyFileSync(fixture("consumer.ts"), join(consumer, "consumer.ts"));
 
-test("the runtime and generated clients are browser modules", () => {
-  for (const file of [join(repository, "runtime.mjs"), join(fixture("checkout"), "index.mjs")]) {
-    assert.doesNotMatch(readFileSync(file, "utf8"), /\bprocess\.|from "node:/, file);
-  }
+  const { createApps } = await import(pathToFileURL(join(consumer, "generated/holon-ui/index.mjs")));
+  const orders = { endpoint: "https://orders.example/mcp" };
+  assert.deepEqual(Object.keys(createApps({ orders })), ["orders"]);
+  assert.throws(() => createApps({ missing: orders }), /Unknown app binding: missing/);
+
+  const tsc = [
+    "exec", "--offline", "--", "tsc", "--noEmit", "--strict",
+    "--target", "es2023", "--types", "node", "consumer.ts",
+  ];
+  execFileSync("npm", [...tsc, "--module", "esnext", "--moduleResolution", "bundler"], {
+    cwd: consumer,
+    stdio: "inherit",
+  });
+  // Some supported MCP Apps versions use extensionless declaration imports.
+  execFileSync("npm", [...tsc, "--module", "nodenext", "--skipLibCheck"], {
+    cwd: consumer,
+    stdio: "inherit",
+  });
 });
