@@ -13,6 +13,8 @@ concurrency:
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml
+    with:
+      version: 0.0.1-dev.${{ github.run_number }}
   publish:
     needs: ci
     runs-on: ubuntu-latest
@@ -20,17 +22,14 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    env:
-      VERSION: 0.0.1-dev.${{ github.run_number }}
     steps:
-      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
       - name: Update npm for trusted publishing
         run: npm install -g npm@11
-      - run: npm ci
-      - name: Set the dev version (not committed)
-        run: npm version "$VERSION" --no-git-tag-version
-      - run: npm publish --tag latest --access public --provenance
+      - uses: actions/download-artifact@v4
+        with:
+          name: package
+          path: dist
+      - run: npm publish ./dist/holon-ui-*.tgz --tag latest --access public --provenance

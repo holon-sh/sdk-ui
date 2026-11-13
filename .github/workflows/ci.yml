@@ -4,6 +4,10 @@ on:
   workflow_dispatch:
   # publish-dev.yml runs this first on every merge to main.
   workflow_call:
+    inputs:
+      version:
+        type: string
+        default: ""
 permissions:
   contents: read
 jobs:
@@ -17,6 +21,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: Set the package version
+        if: inputs.version != ''
+        env:
+          VERSION: ${{ inputs.version }}
+        run: npm version "$VERSION" --no-git-tag-version
       - run: npm pack
       - uses: actions/checkout@v4
         with:
