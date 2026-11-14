@@ -1,5 +1,6 @@
 // Checks holon-ui's own types as the generated connect narrows them; compiling the generated module checks the rest.
 import { connect } from "#holon-ui";
+import { connect as connectWithoutContract } from "holon-ui/runtime";
 import { z } from "zod";
 
 const app = await connect({
@@ -20,3 +21,5 @@ if (opened?.tool === "get_order") opened.output.total.toFixed();
 app.view.close();
 // @ts-expect-error A page tool cannot take the name of one of the app's tools.
 connect({ tools: { get_order: { description: "Shadow", execute: () => {} } } });
+const uncontracted = await connectWithoutContract({ identity: { name: "example.com/checkout", version: "1" }, contracts: { checkout: null }, own: "checkout", endpoint: "/mcp/checkout" });
+(await uncontracted.callTool({ name: "get_order", arguments: { orderId: "own" } })).resultType;
