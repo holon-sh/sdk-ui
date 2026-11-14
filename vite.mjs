@@ -1,5 +1,3 @@
-import { defaultClientConditions } from "vite";
-
 export function holon() {
   return {
     name: "holon",
@@ -11,7 +9,6 @@ export function holon() {
       environments: {
         mcp: {
           consumer: "client",
-          resolve: { conditions: ["mcp-app", ...defaultClientConditions] },
           build: {
             outDir: "../dist/mcp",
             copyPublicDir: false,
@@ -22,6 +19,7 @@ export function holon() {
       },
     }),
     applyToEnvironment: ({ name }) => name === "mcp",
+    resolveId: { order: "pre", handler: id => (id === "holon-ui/runtime" ? `${import.meta.dirname}/runtime.host.mjs` : null) },
     generateBundle: {
       order: "post",
       handler(_, bundle) {

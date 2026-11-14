@@ -40,13 +40,7 @@
     "holon-sh": "^0.0.1-dev.23"
   },
   "peerDependencies": {
-    "@modelcontextprotocol/ext-apps": "^2.0.0",
-    "vite": "^8.0.0"
-  },
-  "peerDependenciesMeta": {
-    "vite": {
-      "optional": true
-    }
+    "@modelcontextprotocol/ext-apps": "^2.0.0"
   },
   "devDependencies": {
     "@modelcontextprotocol/ext-apps": "^2.0.4",
