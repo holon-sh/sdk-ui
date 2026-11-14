@@ -27,11 +27,12 @@ export function holon() {
       handler(_, bundle) {
         const { "index.html": page, ...files } = bundle;
         for (const [name, file] of Object.entries(files)) {
-          const [tag, inline] = file.type === "chunk"
-            ? [`<script type="module" crossorigin src="./${name}"></script>`, () => `<script type="module">${file.code.replaceAll("<!--", "\\x3C!--")}</script>`]
-            : [`<link rel="stylesheet" crossorigin href="./${name}">`, () => `<style>${file.source.replaceAll("</", "<\\/")}</style>`];
-          if (!page.source.includes(tag)) this.error(`A host loads the view as one HTML file, so it cannot load ${name}; import a worker with ?worker&inline`);
-          page.source = page.source.replace(tag, inline);
+          const url = page.source.indexOf(`"./${name}"`);
+          if (url < 0) this.error(`holon-ui/vite cannot inline ${name} into the view, which a host loads as one HTML file; import a worker with ?worker&inline`);
+          const startTag = page.source.slice(page.source.lastIndexOf("<", url), page.source.indexOf(">", url) + 1);
+          page.source = page.source.replace(startTag, () => file.type === "chunk"
+            ? `<script type="module">${file.code.replaceAll("<!--", "\\x3C!--")}`
+            : `<style>${file.source.replaceAll("</", "<\\/")}</style>`);
           delete bundle[name];
         }
       },
