@@ -49,6 +49,6 @@ export type Page<C> =
 export type Connect<C> = <S extends Record<string, unknown> = {}>(options?: ConnectOptions<S> & { tools?: { [K in keyof Tools<C>]?: never } }) => Promise<Page<C>>;
 /** Bind the page to its own app on the surface its build chose, and offer every tool to whichever agent is present. Most pages call the generated connect from #holon-ui. */
 export declare function connect<S extends Record<string, unknown> = {}>(
-  app: { identity: Identity; /** A project that cannot generate its own app's contract, such as one with a Go server, passes null for it: calls go unvalidated through callTool, and WebMCP is offered every tool the app lists. */ contracts: Record<string, Contract | null>; own: string; /** The app's MCP endpoint on the page's origin, such as "/mcp/checkout". */ endpoint: string },
+  app: { identity: Identity; contracts: Record<string, Contract | null>; own: string; /** The app's MCP endpoint on the page's origin, such as "/mcp/checkout". */ endpoint: string },
   options?: ConnectOptions<S>,
 ): Promise<Page<RuntimeClient>>;

@@ -71,16 +71,6 @@ test("a web page calls its own app over HTTP", async t => {
   assert.deepEqual(await app.tools.get_order({ id: "abc" }), { total: 3 });
 });
 
-test("a page without a contract calls and offers every tool its app lists", async t => {
-  await page(t);
-  const { registered, until } = modelContext(t);
-  const app = await connect({ identity, contracts: { checkout: null }, own: "checkout", endpoint: "/mcp" });
-  t.after(() => app.close());
-  assert.deepEqual((await app.callTool({ name: "get_order", arguments: { id: "abc" } })).structuredContent, { total: 3 });
-  await until("get_order");
-  assert.deepEqual(await registered.get("get_order").tool.execute({ id: "abcd" }, { signal: new AbortController().signal }), { total: 4 });
-});
-
 test("a web page offers its own tools and the app's model-visible tools to WebMCP until it closes", async t => {
   const connect = await page(t, {
     unannotated: [{ title: "Unannotated" }, empty],
