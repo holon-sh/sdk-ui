@@ -17,12 +17,18 @@
       "types": "./runtime.d.ts",
       "mcp-app": "./runtime.host.mjs",
       "default": "./runtime.web.mjs"
+    },
+    "./vite": {
+      "types": "./vite.d.ts",
+      "default": "./vite.mjs"
     }
   },
   "files": [
     "runtime.d.ts",
     "runtime.host.mjs",
     "runtime.web.mjs",
+    "vite.d.ts",
+    "vite.mjs",
     "README.md"
   ],
   "scripts": {
@@ -34,7 +40,13 @@
     "holon-sh": "^0.0.1-dev.23"
   },
   "peerDependencies": {
-    "@modelcontextprotocol/ext-apps": "^2.0.0"
+    "@modelcontextprotocol/ext-apps": "^2.0.0",
+    "vite": "^8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@modelcontextprotocol/ext-apps": "^2.0.4",
@@ -42,6 +54,7 @@
     "@modelcontextprotocol/server": "2.3.1",
     "@types/node": "^22.0.0",
     "typescript": "~5.9.3",
+    "vite": "8.3.8",
     "zod": "4.6.6"
   }
 }
