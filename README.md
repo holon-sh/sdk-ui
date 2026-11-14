@@ -8,7 +8,7 @@ Typed MCP clients for browser pages. One `connect()` serves a page as an MCP App
 
 ```sh
 npm install holon-ui
-npm install -D holon-types typescript
+npm install -D holon-types typescript vite
 ```
 
 ## Create an app
@@ -96,19 +96,18 @@ Host-only features are on `app.view`, the ext-apps `App`:
 if (app.view) app.view.onhostcontextchanged = ({ theme }) => { if (theme) document.documentElement.style.colorScheme = theme; };
 ```
 
-## Building the view
+## Building the page
 
-A view is its own build. Set the `mcp-app` condition in it, and `holon-ui` calls through the host there and over HTTP everywhere else:
+`holon-ui/vite` builds `ui/index.html` twice in one `vite build`: the web page into `dist/web`, and the view into `dist/mcp/index.html`, one self-contained file in which `holon-ui` calls through the host:
 
 ```ts
-import { defaultClientConditions, defineConfig } from "vite";
+import { defineConfig } from "vite";
+import { holon } from "holon-ui/vite";
 
-export default defineConfig(({ mode }) => ({
-  resolve: { conditions: mode === "mcp" ? ["mcp-app", ...defaultClientConditions] : undefined },
-}));
+export default defineConfig({ plugins: [holon()] });
 ```
 
-`create-holon-app` sets this up.
+`create-holon-app` sets this up. With another bundler, build the view with the `mcp-app` export condition.
 
 ## Community
 

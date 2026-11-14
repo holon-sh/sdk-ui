@@ -1,0 +1,7 @@
+output {
+  background: url("./texture.bin");
+}
+
+output::before {
+  content: "</style>";
+}
