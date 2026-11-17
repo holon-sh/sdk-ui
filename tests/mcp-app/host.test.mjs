@@ -24,7 +24,7 @@ async function view(t, { hostContext, tools } = {}) {
   return { app, bridge };
 }
 
-test("a view introduces itself as its app and calls the app through the host", async t => {
+test("a view introduces itself, calls the app through the host, and disconnects on close", async t => {
   const { app, bridge } = await view(t);
   bridge.oncalltool = async ({ arguments: args }) => ({ content: [], structuredContent: { total: args.id.length } });
   bridge.onreadresource = async ({ uri }) => ({ contents: [{ uri, mimeType: "application/json", text: JSON.stringify({ total: 1 }) }] });
@@ -32,6 +32,9 @@ test("a view introduces itself as its app and calls the app through the host", a
   assert.deepEqual(bridge.getAppVersion(), { name: "example.com/checkout", version: "1.2.0" });
   assert.deepEqual(await app.tools.get_order({ id: "abc" }), { total: 3 });
   assert.deepEqual(await app.resources["orders://summary"].read(), { total: 1 });
+  const closed = new Promise(resolve => { bridge.onclose = resolve; });
+  await app.close();
+  await closed;
 });
 
 test("the host's agent lists the page's tools and gets each outcome as an MCP result", async t => {
@@ -81,19 +84,8 @@ test("opened is the call that opened the view, with what its tool returns", asyn
 });
 
 test("an opening call that fails is no unhandled rejection when the page ignores it", async t => {
-  const unhandled = [];
-  const record = reason => unhandled.push(reason);
-  process.on("unhandledRejection", record);
-  t.after(() => process.off("unhandledRejection", record));
   const { bridge } = await view(t);
   await bridge.sendToolCancelled({});
+  // Give node:test a turn to report an unhandled rejection.
   await new Promise(resolve => setImmediate(resolve));
-  assert.deepEqual(unhandled, []);
-});
-
-test("close closes the view", async t => {
-  const { app, bridge } = await view(t);
-  const closed = new Promise(resolve => { bridge.onclose = resolve; });
-  await app.close();
-  await closed;
 });

@@ -1,6 +1,6 @@
 import type { App, AppOptions } from "@modelcontextprotocol/ext-apps";
-import type { StandardSchemaV1, StandardSchemaWithJSON, ToolAnnotations, Transport } from "@modelcontextprotocol/client";
-import type { EndpointBinding, Identity, Contract, RuntimeClient } from "holon-sh/runtime";
+import type { StandardSchemaV1, StandardSchemaWithJSON, ToolAnnotations } from "@modelcontextprotocol/client";
+import type { Identity, Contract, RuntimeClient } from "holon-sh/runtime";
 export type { CreateOptions, EndpointBinding, Identity, Contract, RuntimeClient } from "holon-sh/runtime";
 export type { AuthProvider, CallOptions, CallMetadata, ToolResult, ToolClient } from "holon-sh/runtime";
 export { bindApps, ToolCallError } from "holon-sh/runtime";
@@ -20,7 +20,7 @@ export interface ConnectOptions<S extends Record<string, unknown> = {}> {
   /** Page tools by name, offered to the host's agent in an MCP Apps host and to the browser's agent through WebMCP. */
   tools?: { [K in keyof S]: PageTool<S[K]> };
   /** The ext-apps App's options in an MCP Apps host, and the transport to connect it with; ignored on a web page. */
-  view?: AppOptions & { transport?: Transport };
+  view?: AppOptions & { transport?: Parameters<App["connect"]>[0] };
 }
 type Tools<C> = C extends { tools: infer T } ? T : never;
 /** The tool call that opened a view: typed by its tool, or untyped when the host does not say which tool it was. */
