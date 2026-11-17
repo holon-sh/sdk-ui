@@ -71,6 +71,22 @@ test("a web page calls its own app over HTTP", async t => {
   assert.deepEqual(await app.tools.get_order({ id: "abc" }), { total: 3 });
 });
 
+test("a web page binds its app as it is told: at an endpoint relative to its origin or elsewhere, through its own fetch", async t => {
+  const connect = await page(t);
+  const sent = [];
+  const fetchSent = (input, init) => {
+    sent.push(new Headers(init?.headers).get("mcp-method"));
+    return fetch(input, init);
+  };
+  const here = await connect({ web: { endpoint: "/mcp", fetch: fetchSent } });
+  assert.deepEqual(await here.tools.get_order({ id: "abc" }), { total: 3 });
+  assert.ok(sent.includes("tools/call"));
+  const { origin } = globalThis.location;
+  globalThis.location = { origin: "http://127.0.0.1:9" };
+  const elsewhere = await connect({ web: { endpoint: `${origin}/mcp` } });
+  assert.deepEqual(await elsewhere.tools.get_order({ id: "abcd" }), { total: 4 });
+});
+
 test("a web page offers its own tools and the app's model-visible tools to WebMCP until it closes", async t => {
   const connect = await page(t, {
     unannotated: [{ title: "Unannotated" }, empty],
