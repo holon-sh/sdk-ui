@@ -23,8 +23,9 @@ export async function connect({ identity, contracts, own, endpoint }, { tools = 
           // MCP Apps: a tool whose visibility omits "model" must not reach the agent; absent means ["model", "app"].
           // https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx#resource-discovery
           // A typed client calls only its contract's tools, and an agent cannot write a file argument.
+          if (!(tool._meta?.ui?.visibility ?? ["model"]).includes("model") || !contracted(tool.name)) continue;
           const inputSchema = withoutFiles(tool.inputSchema);
-          if ((tool._meta?.ui?.visibility ?? ["model"]).includes("model") && contracted(tool.name) && inputSchema) offer(serverTool(own, client, tool, inputSchema));
+          if (inputSchema !== FILE) offer(serverTool(own, client, tool, inputSchema));
         }
       },
       error => signal.aborted || console.warn(`Could not list the tools of ${own} for WebMCP:`, error),
@@ -39,8 +40,7 @@ function pageTool(name, { description, inputSchema, annotations, execute }) {
     name, title: annotations?.title, description, annotations: hints(annotations),
     inputSchema: standard?.jsonSchema.input({ target: "draft-2020-12" }),
     execute: async (input, { signal }) => {
-      if (!standard) return execute({}, { signal });
-      const parsed = await standard.validate(input);
+      const parsed = standard ? await standard.validate(input) : { value: {} };
       if (parsed.issues) throw new Error(`Invalid arguments for ${name}: ${JSON.stringify(parsed.issues)}`);
       return execute(parsed.value, { signal });
     },
@@ -70,22 +70,21 @@ function hints(annotations) {
   return { readOnlyHint, consequentialHint: !readOnlyHint && annotations?.destructiveHint !== false, untrustedContentHint: annotations?.openWorldHint !== false };
 }
 
-const hasFile = node => Array.isArray(node) ? node.some(hasFile) : typeof node === "object" && node !== null && ("x-mcp-file" in node || Object.values(node).some(hasFile));
+const FILE = Symbol("schema requires a file");
 
 // An agent writes arguments as tokens, so it is not shown a file argument (x-mcp-file): an anyOf or oneOf branch that
 // holds one is left out, and a tool that still has one is not exposed.
 // https://github.com/modelcontextprotocol/experimental-ext-file-uploads/blob/main/specification/draft/file-uploads.md#file-arguments
-function withoutFiles(schema) {
-  const prune = node => {
-    if (Array.isArray(node)) return node.map(prune);
-    if (typeof node !== "object" || node === null) return node;
-    const pruned = Object.fromEntries(Object.entries(node).map(([key, value]) => [key, prune(value)]));
-    for (const key of ["anyOf", "oneOf"]) {
-      const kept = Array.isArray(pruned[key]) ? pruned[key].filter(branch => !hasFile(branch)) : [];
-      if (kept.length) pruned[key] = kept;
-    }
-    return pruned;
-  };
-  const pruned = prune(schema);
-  return hasFile(pruned) ? undefined : pruned;
+function withoutFiles(node, key) {
+  if (Array.isArray(node)) {
+    const items = node.map(item => withoutFiles(item));
+    if (!items.includes(FILE)) return items;
+    if (key !== "anyOf" && key !== "oneOf") return FILE;
+    const kept = items.filter(item => item !== FILE);
+    return kept.length ? kept : FILE;
+  }
+  if (typeof node !== "object" || node === null) return node;
+  if (Object.hasOwn(node, "x-mcp-file")) return FILE;
+  const entries = Object.entries(node).map(([key, value]) => [key, withoutFiles(value, key)]);
+  return entries.some(([, value]) => value === FILE) ? FILE : Object.fromEntries(entries);
 }
