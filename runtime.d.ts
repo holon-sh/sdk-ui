@@ -21,7 +21,7 @@ export interface ConnectOptions<S extends Record<string, unknown> = {}> {
   tools?: { [K in keyof S]: PageTool<S[K]> };
   /** The ext-apps App's options in an MCP Apps host, and the transport to connect it with; ignored on a web page. */
   view?: AppOptions & { transport?: Parameters<App["connect"]>[0] };
-  /** The app's binding on a web page, in place of the generated endpoint on the page's origin; ignored in an MCP Apps host. */
+  /** The app's binding on a web page, in place of the generated one; its endpoint resolves against the page's origin. Ignored in an MCP Apps host. */
   web?: EndpointBinding;
 }
 type Tools<C> = C extends { tools: infer T } ? T : never;

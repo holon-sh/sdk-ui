@@ -6,8 +6,8 @@ import { bindApps, ToolCallError } from "holon-sh/runtime";
 
 export { bindApps, ToolCallError };
 
-export async function connect({ identity, contracts, own, endpoint }, { tools = {}, web = { endpoint: new URL(endpoint, location.origin) } } = {}) {
-  const client = bindApps(identity, contracts, { [own]: web })[own];
+export async function connect({ identity, contracts, own, endpoint }, { tools = {}, web = { endpoint } } = {}) {
+  const client = bindApps(identity, contracts, { [own]: { ...web, endpoint: new URL(web.endpoint, location.origin) } })[own];
   const lifetime = new AbortController();
   const context = globalThis.document?.modelContext;
   // Offering tools is secondary to the page working: the page does not wait for it, and a failure is only reported.
