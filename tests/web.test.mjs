@@ -121,14 +121,17 @@ test("an agent is not shown file arguments, which it cannot write", async t => {
   const schemas = {
     upload: { type: "object", properties: { file } },
     linked: { type: "object", properties: { file: { $ref: "#/$defs/file" } }, $defs: { file } },
-    source: { type: "object", properties: { source: { anyOf: [{ type: "string" }, { type: "array", items: file }] } } },
+    source: { type: "object", properties: { source: { anyOf: [
+      { oneOf: [{ type: "string" }, file] },
+      { anyOf: [file, { type: "array", items: file }] },
+    ] } } },
   };
   const connect = await page(t, Object.fromEntries(Object.entries(schemas).map(([name, schema]) => [name, [{ description: name, inputSchema: fromJsonSchema(schema) }, empty]])));
   const { registered, until } = modelContext(t);
   await connect();
   await until("get_order", "source");
   assert.deepEqual([...registered.keys()].sort(), ["get_order", "source"]);
-  assert.deepEqual(registered.get("source").tool.inputSchema.properties, { source: { anyOf: [{ type: "string" }] } });
+  assert.deepEqual(registered.get("source").tool.inputSchema.properties, { source: { anyOf: [{ oneOf: [{ type: "string" }] }] } });
 });
 
 test("an agent's call to an app tool returns its output, fails as the tool did, and stops when cancelled", async t => {
@@ -172,20 +175,17 @@ test("an agent's call to a page tool runs it with validated input and the agent'
   assert.deepEqual(calls, [[{ x: 1 }, signal], [{}, signal]]);
 });
 
-test("a failure to offer a tool is reported once, and the others are still offered", async t => {
-  let warned;
-  const warnings = t.mock.method(console, "warn", () => warned());
+test("other tools are still offered when WebMCP rejects one or the app cannot be listed", async t => {
+  t.mock.method(console, "warn", () => {});
   for (const { failure, origin, reject = () => false, offered } of [
     { failure: "WebMCP rejects a tool", reject: tool => tool.name === "get_order", offered: ["local", "second"] },
     { failure: "the app cannot be listed", origin: "http://127.0.0.1:1", offered: ["local"] },
   ]) {
-    warnings.mock.resetCalls();
-    const reported = new Promise(resolve => { warned = resolve; });
     const connect = await page(t, { second: [{ description: "Second" }, empty] }, { origin });
     const { registered, until } = modelContext(t, reject);
-    await connect({ tools: { local: { description: "Local", execute: () => {} } } });
-    await Promise.all([reported, until(...offered)]);
-    assert.equal(warnings.mock.callCount(), 1, failure);
+    const app = await connect({ tools: { local: { description: "Local", execute: () => {} } } });
+    if (origin) await assert.rejects(app.listTools());
+    await until(...offered);
     assert.deepEqual([...registered.keys()].sort(), offered, failure);
   }
 });

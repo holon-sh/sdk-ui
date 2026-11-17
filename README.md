@@ -60,12 +60,6 @@ result.toFixed();
 // error TS2551: Property 'toFixed' does not exist on type 'string'. Did you mean 'fixed'?
 ```
 
-On a web page, `web` binds the app as `bindApps` does, such as at another endpoint or through a `fetch` that adds headers:
-
-```ts
-const app = await connect({ web: { endpoint: "/api/mcp", fetch: withSession } });
-```
-
 ## Tools that run in the page
 
 `connect` offers them to whichever agent is present: the host's agent in an MCP Apps host, the browser's agent through WebMCP on a web page.
