@@ -14,11 +14,10 @@ export async function connect({ identity, contracts, own, endpoint }, { tools = 
   // Aborting the lifetime unregisters every tool. https://webmachinelearning.github.io/webmcp/#dom-modelcontext-registertool
   if (context) {
     const { signal } = lifetime;
-    const offered = [];
-    const offer = tool => {
-      offered.push(tool);
-      context.registerTool(tool, { signal }).catch(error => console.warn(`WebMCP did not accept the tool ${tool.name}:`, error));
-    };
+    const offered = new Map();
+    const register = tool => context.registerTool(tool, { signal }).then(() => true, error => console.warn(`WebMCP did not accept the tool ${tool.name}:`, error));
+    const offer = async tool => await register(tool) && offered.set(tool.name, tool);
+    if (batch) register(batchTool(offered));
     for (const [name, tool] of Object.entries(tools)) offer(pageTool(name, tool));
     const contracted = name => !contracts[own] || contracts[own].tools.some(tool => tool.name === name);
     client.listTools({ signal }).then(
@@ -31,7 +30,6 @@ export async function connect({ identity, contracts, own, endpoint }, { tools = 
           const inputSchema = withoutFiles(tool.inputSchema);
           if (inputSchema !== FILE) offer(serverTool(own, client, tool, inputSchema));
         }
-        if (batch) offer(batchTool(offered));
       },
       error => signal.aborted || console.warn(`Could not list the tools of ${own} for WebMCP:`, error),
     );
@@ -66,22 +64,20 @@ function serverTool(own, client, tool, inputSchema) {
   };
 }
 
-function batchTool(tools) {
-  const byName = new Map(tools.map(tool => [tool.name, tool]));
-  const call = { type: "object", properties: { tool: { enum: [...byName.keys()] }, input: { type: "object" } }, required: ["tool", "input"] };
+function batchTool(offered) {
+  const call = { type: "object", properties: { tool: { type: "string" }, input: { type: "object" } }, required: ["tool", "input"] };
   return {
     name: "call_tools",
     description: "Run several of this page's tools in order, in one call. Stops at the first that fails, and returns the outputs before it and its error.",
     inputSchema: { type: "object", properties: { calls: { type: "array", items: call } }, required: ["calls"] },
-    annotations: {
-      readOnlyHint: tools.every(tool => tool.annotations.readOnlyHint),
-      consequentialHint: tools.some(tool => tool.annotations.consequentialHint),
-      untrustedContentHint: tools.some(tool => tool.annotations.untrustedContentHint),
-    },
+    annotations: hints(),
     execute: async ({ calls }, client) => {
       const outputs = [];
       try {
-        for (const { tool, input } of calls) outputs.push(await byName.get(tool).execute(input, client));
+        for (const { tool, input } of calls) {
+          client.signal.throwIfAborted();
+          outputs.push(await offered.get(tool).execute(input, client));
+        }
       } catch (error) {
         return { outputs, error: String(error) };
       }

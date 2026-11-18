@@ -89,7 +89,7 @@ With `batch`, a web page also offers `call_tools`, which runs several of the off
 const app = await connect({ batch: true });
 ```
 
-It stops at the first tool that fails, and returns the outputs before it and the error. In an MCP Apps host `batch` is ignored.
+It stops at the first tool that fails, and returns the outputs before it and the error. Whatever tools it runs, its hints are those of an unannotated tool: it may change or destroy things. In an MCP Apps host `batch` is ignored.
 
 ## The call that opened a view
 
