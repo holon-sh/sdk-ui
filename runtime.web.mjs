@@ -6,7 +6,7 @@ import { bindApps, ToolCallError } from "holon-sh/runtime";
 
 export { bindApps, ToolCallError };
 
-export async function connect({ identity, contracts, own, endpoint }, { tools = {}, web = { endpoint } } = {}) {
+export async function connect({ identity, contracts, own, endpoint }, { tools = {}, batch = false, web = { endpoint } } = {}) {
   const client = bindApps(identity, contracts, { [own]: { ...web, endpoint: new URL(web.endpoint, location.origin) } })[own];
   const lifetime = new AbortController();
   const context = globalThis.document?.modelContext;
@@ -14,7 +14,10 @@ export async function connect({ identity, contracts, own, endpoint }, { tools = 
   // Aborting the lifetime unregisters every tool. https://webmachinelearning.github.io/webmcp/#dom-modelcontext-registertool
   if (context) {
     const { signal } = lifetime;
-    const offer = tool => context.registerTool(tool, { signal }).catch(error => console.warn(`WebMCP did not accept the tool ${tool.name}:`, error));
+    const offered = new Map();
+    const register = tool => context.registerTool(tool, { signal }).then(() => true, error => console.warn(`WebMCP did not accept the tool ${tool.name}:`, error));
+    const offer = async tool => await register(tool) && offered.set(tool.name, tool);
+    if (batch) register(batchTool(offered));
     for (const [name, tool] of Object.entries(tools)) offer(pageTool(name, tool));
     const contracted = name => !contracts[own] || contracts[own].tools.some(tool => tool.name === name);
     client.listTools({ signal }).then(
@@ -57,6 +60,28 @@ function serverTool(own, client, tool, inputSchema) {
       // An agent can only supply arguments, so it cannot answer a question the server asks back.
       if (result.resultType === "input_required" || result.isError) throw new ToolCallError(own, tool.name, result);
       return result.structuredContent ?? result.content;
+    },
+  };
+}
+
+function batchTool(offered) {
+  const call = { type: "object", properties: { tool: { type: "string" }, input: { type: "object" } }, required: ["tool", "input"] };
+  return {
+    name: "call_tools",
+    description: "Run several of this page's tools in order, in one call. Stops at the first that fails, and returns the outputs before it and its error.",
+    inputSchema: { type: "object", properties: { calls: { type: "array", items: call } }, required: ["calls"] },
+    annotations: hints(),
+    execute: async ({ calls }, client) => {
+      const outputs = [];
+      try {
+        for (const { tool, input } of calls) {
+          client.signal.throwIfAborted();
+          outputs.push(await offered.get(tool).execute(input, client));
+        }
+      } catch (error) {
+        return { outputs, error: String(error) };
+      }
+      return { outputs };
     },
   };
 }
