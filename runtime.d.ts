@@ -19,6 +19,7 @@ export interface PageTool<S = undefined> {
 export interface ConnectOptions<S extends Record<string, unknown> = {}> {
   /** Page tools by name, offered to the host's agent in an MCP Apps host and to the browser's agent through WebMCP. */
   tools?: { [K in keyof S]: PageTool<S[K]> };
+  batch?: "call_tools" extends keyof S ? false : boolean;
   /** The ext-apps App's options in an MCP Apps host, and the transport to connect it with; ignored on a web page. */
   view?: AppOptions & { transport?: Parameters<App["connect"]>[0] };
   /** The app's binding on a web page, in place of the generated one; its endpoint resolves against the page's origin. Ignored in an MCP Apps host. */
@@ -48,7 +49,7 @@ export type Page<C> =
     readonly opened: undefined;
   });
 /** connect, narrowed by the generated #holon-ui module to the client C of the project's own app. A page tool cannot take the name of one of the app's tools. */
-export type Connect<C> = <S extends Record<string, unknown> = {}>(options?: ConnectOptions<S> & { tools?: { [K in keyof Tools<C>]?: never } }) => Promise<Page<C>>;
+export type Connect<C> = <S extends Record<string, unknown> = {}>(options?: ConnectOptions<S> & { tools?: { [K in keyof Tools<C>]?: never }; batch?: "call_tools" extends keyof Tools<C> ? false : boolean }) => Promise<Page<C>>;
 /** Bind the page to its own app on the surface its build chose, and offer every tool to whichever agent is present. Most pages call the generated connect from #holon-ui. */
 export declare function connect<S extends Record<string, unknown> = {}>(
   app: { identity: Identity; contracts: Record<string, Contract | null>; own: string; /** The app's MCP endpoint on the page's origin, such as "/mcp/checkout". */ endpoint: string },

@@ -81,6 +81,16 @@ const app = await connect({
 
 On a web page, the browser's agent is also offered the server's tools that the generated clients know, leaving out those whose `_meta.ui.visibility` lacks `"model"` and those that need a file argument. In a host, its agent already has them.
 
+## Several tools in one call
+
+With `batch`, a web page also offers `call_tools`, which runs several of the offered tools in order in one call:
+
+```ts
+const app = await connect({ batch: true });
+```
+
+It stops at the first tool that fails, and returns the outputs before it and the error. In an MCP Apps host `batch` is ignored.
+
 ## The call that opened a view
 
 In an MCP Apps host, `app.opened` is the tool call that opened the view, with the output its tool returns. On a web page it is `undefined`.
