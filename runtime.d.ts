@@ -19,6 +19,7 @@ export interface PageTool<S = undefined> {
 export interface ConnectOptions<S extends Record<string, unknown> = {}> {
   /** Page tools by name, offered to the host's agent in an MCP Apps host and to the browser's agent through WebMCP. */
   tools?: { [K in keyof S]: PageTool<S[K]> };
+  /** On a web page, also offer call_tools, which runs several of the other offered tools in one call. Ignored in an MCP Apps host, whose agent calls the app's tools itself. */
   batch?: "call_tools" extends keyof S ? false : boolean;
   /** The ext-apps App's options in an MCP Apps host, and the transport to connect it with; ignored on a web page. */
   view?: AppOptions & { transport?: Parameters<App["connect"]>[0] };
