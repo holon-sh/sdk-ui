@@ -1,0 +1,69 @@
+diff --git a/benchmarks/agent/harness/bench.mjs b/benchmarks/agent/harness/bench.mjs
+index 4dfb6953..58396805 100644
+--- a/benchmarks/agent/harness/bench.mjs
++++ b/benchmarks/agent/harness/bench.mjs
+@@ -41,6 +41,30 @@ const frameworks = {
+       serve: "form",
+       expect: 7,
+     },
++    {
++      screen: "holon-domain",
++      tools: "agent",
++      library: "holon-ui domain tools",
++      serve: "domain",
++      expect: 5,
++      saved: "server",
++    },
++    {
++      screen: "holon-page",
++      tools: "agent",
++      library: "holon-ui page's tools",
++      serve: "page",
++      expect: 2,
++      saved: "server",
++    },
++    {
++      screen: "holon-batch",
++      tools: "agent",
++      library: "holon-ui domain tools + batch",
++      serve: "domain",
++      expect: 6,
++      saved: "server",
++    },
+   ],
+ }
+ frameworks.all = [...frameworks.react, ...frameworks.holon]
+@@ -162,6 +186,10 @@ async function operate(arm, round, app) {
+   const screen = await openScreen({
+     app: served ? served.url : app,
+     expect: arm.expect,
++    saved:
++      arm.saved === "server"
++        ? () => fetch(`${served.url}/__saved`).then((response) => response.json())
++        : undefined,
+     port,
+     token,
+     screen: arm.screen,
+diff --git a/benchmarks/agent/harness/browser.mjs b/benchmarks/agent/harness/browser.mjs
+index 52e704c4..f26f6ddf 100644
+--- a/benchmarks/agent/harness/browser.mjs
++++ b/benchmarks/agent/harness/browser.mjs
+@@ -54,6 +54,7 @@ async function openScreen({
+   x = 0,
+   width = 480,
+   expect = 0,
++  saved,
+ }) {
+   mkdirSync(dir, { recursive: true })
+   const browser = await chromium.launch({
+@@ -87,7 +88,9 @@ async function openScreen({
+     const at = Date.now()
+     stats.calls++
+     if (tool === "done") {
+-      stats.saved = await page.evaluate(() => window.__saved ?? [])
++      stats.saved = saved
++        ? await saved()
++        : await page.evaluate(() => window.__saved ?? [])
+       stats.done = true
+       return "Done."
+     }

@@ -1,0 +1,96 @@
+diff --git a/benchmarks/agent/harness/bench.mjs b/benchmarks/agent/harness/bench.mjs
+index 483261de..4dfb6953 100644
+--- a/benchmarks/agent/harness/bench.mjs
++++ b/benchmarks/agent/harness/bench.mjs
+@@ -25,7 +25,25 @@ const frameworks = {
+     { screen: "svelte-ui-sdk", tools: "browser", library: "ui-sdk" },
+     { screen: "svelte-ui-sdk", tools: "agent", library: "ui-sdk" },
+   ],
++  holon: [
++    { screen: "holon", tools: "browser", library: "holon-ui", serve: "form" },
++    {
++      screen: "holon-form",
++      tools: "agent",
++      library: "holon-ui form tools",
++      serve: "form",
++      expect: 6,
++    },
++    {
++      screen: "holon-form-batch",
++      tools: "agent",
++      library: "holon-ui form tools + batch",
++      serve: "form",
++      expect: 7,
++    },
++  ],
+ }
++frameworks.all = [...frameworks.react, ...frameworks.holon]
+ 
+ const { values: flags } = parseArgs({
+   options: {
+@@ -117,12 +135,33 @@ async function appUrl() {
+   throw new Error("The benchmark app didn't start.")
+ }
+ 
++async function serve(arm, round) {
++  const url = `http://127.0.0.1:${5700 + round * 10 + arms.indexOf(arm)}`
++  const server = path.join(import.meta.dirname, "../../../../server.mjs")
++  const { child } = run("node", [
++    server,
++    "--port",
++    new URL(url).port,
++    "--tools",
++    arm.serve,
++  ])
++  for (let tries = 0; tries < 50; tries++) {
++    if (await fetch(url).then((response) => response.ok, () => false)) {
++      return { url, child }
++    }
++    await new Promise((resolve) => setTimeout(resolve, 100))
++  }
++  throw new Error("The holon-ui app didn't start.")
++}
++
+ // Both get the same short system prompt and only Bash, limited to the one
+ // command, in an empty folder, so the numbers compare the tools and nothing else.
+ async function operate(arm, round, app) {
+   const port = 5600 + arms.indexOf(arm)
++  const served = arm.serve ? await serve(arm, round) : null
+   const screen = await openScreen({
+-    app,
++    app: served ? served.url : app,
++    expect: arm.expect,
+     port,
+     token,
+     screen: arm.screen,
+@@ -169,6 +208,7 @@ async function operate(arm, round, app) {
+     message: result.result ?? "",
+   }
+   await screen.close()
++  served?.child.kill()
+   return measured
+ }
+ 
+diff --git a/benchmarks/agent/harness/browser.mjs b/benchmarks/agent/harness/browser.mjs
+index 2408624b..52e704c4 100644
+--- a/benchmarks/agent/harness/browser.mjs
++++ b/benchmarks/agent/harness/browser.mjs
+@@ -53,6 +53,7 @@ async function openScreen({
+   headed = false,
+   x = 0,
+   width = 480,
++  expect = 0,
+ }) {
+   mkdirSync(dir, { recursive: true })
+   const browser = await chromium.launch({
+@@ -66,6 +67,10 @@ async function openScreen({
+   const query = new URLSearchParams({ screen, ...(label ? { label } : {}) })
+   await page.goto(`${app}/?${query}${tools === "agent" ? "&agent" : ""}`)
+   await page.waitForSelector("body[data-mounted]")
++  await page.waitForFunction(
++    (count) => count === 0 || window.__agentTools?.length >= count,
++    expect
++  )
+ 
+   const described =
+     tools === "agent" ? await page.evaluate(() => window.__agentTools) : null
