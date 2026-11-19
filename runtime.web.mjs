@@ -37,15 +37,20 @@ export async function connect({ identity, contracts, own, endpoint }, { tools = 
   return Object.freeze({ ...client, view: undefined, opened: undefined, close: async () => { lifetime.abort(); await client.close(); } });
 }
 
-function pageTool(name, { description, inputSchema, annotations, execute }) {
+function pageTool(name, { description, inputSchema, outputSchema, annotations, execute }) {
   const standard = inputSchema?.["~standard"];
+  const output = outputSchema?.["~standard"];
   return {
     name, title: annotations?.title, description, annotations: hints(annotations),
     inputSchema: standard?.jsonSchema.input({ target: "draft-2020-12" }),
+    outputSchema: output?.jsonSchema.output({ target: "draft-2020-12" }),
     execute: async (input, { signal }) => {
       const parsed = standard ? await standard.validate(input) : { value: {} };
       if (parsed.issues) throw new Error(`Invalid arguments for ${name}: ${JSON.stringify(parsed.issues)}`);
-      return execute(parsed.value, { signal });
+      const result = await execute(parsed.value, { signal });
+      const checked = output ? await output.validate(result) : { value: result };
+      if (checked.issues) throw new Error(`Invalid output for ${name}: ${JSON.stringify(checked.issues)}`);
+      return checked.value;
     },
   };
 }

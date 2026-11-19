@@ -5,20 +5,22 @@ export type { CreateOptions, EndpointBinding, Identity, Contract, RuntimeClient 
 export type { AuthProvider, CallOptions, CallMetadata, ToolResult, ToolClient } from "holon-sh/runtime";
 export { bindApps, ToolCallError } from "holon-sh/runtime";
 
-/** A tool the page declares. It runs in the browser and acts on what the person is looking at. S is its input schema's type. */
-export interface PageTool<S = undefined> {
+/** A tool the page declares. It runs in the browser and acts on what the person is looking at. S and O are its input and output schemas' types. */
+export interface PageTool<S = undefined, O = undefined> {
   /** Shown to the agent. Required and non-empty. */
   description: string;
   /** Validates the agent's arguments, such as a Zod 4 object. Without one the tool takes no arguments. */
   inputSchema?: S & StandardSchemaWithJSON;
+  /** Describes and validates the object execute returns, such as a Zod 4 object. */
+  outputSchema?: O & StandardSchemaWithJSON;
   annotations?: ToolAnnotations;
   /** Receives validated input. Returns a JSON value, or a promise of one; throwing reports failure. signal aborts when the agent cancels. */
-  execute: (input: S extends StandardSchemaV1 ? StandardSchemaV1.InferOutput<S> : Record<string, never>, options: { signal: AbortSignal }) => unknown;
+  execute: (input: S extends StandardSchemaV1 ? StandardSchemaV1.InferOutput<S> : Record<string, never>, options: { signal: AbortSignal }) => O extends StandardSchemaV1 ? StandardSchemaV1.InferInput<O> | Promise<StandardSchemaV1.InferInput<O>> : unknown;
 }
-// S is inferred per tool. A tool without an input schema leaves its slot unknown, so the slots are unconstrained.
-export interface ConnectOptions<S extends Record<string, unknown> = {}> {
+// S and O are inferred per tool. A tool without a schema leaves its slot unknown, so the slots are unconstrained.
+export interface ConnectOptions<S extends Record<string, unknown> = {}, O extends Record<string, unknown> = {}> {
   /** Page tools by name, offered to the host's agent in an MCP Apps host and to the browser's agent through WebMCP. */
-  tools?: { [K in keyof S]: PageTool<S[K]> };
+  tools?: { [K in keyof S]: PageTool<S[K], O[K & keyof O]> } & { [K in keyof O]: { outputSchema?: O[K] & StandardSchemaWithJSON } };
   /** On a web page, also offer call_tools, which runs several of the other offered tools in one call. Ignored in an MCP Apps host, whose agent calls the app's tools itself. */
   batch?: "call_tools" extends keyof S ? false : boolean;
   /** The ext-apps App's options in an MCP Apps host, and the transport to connect it with; ignored on a web page. */
@@ -50,9 +52,9 @@ export type Page<C> =
     readonly opened: undefined;
   });
 /** connect, narrowed by the generated #holon-ui module to the client C of the project's own app. A page tool cannot take the name of one of the app's tools. */
-export type Connect<C> = <S extends Record<string, unknown> = {}>(options?: ConnectOptions<S> & { tools?: { [K in keyof Tools<C>]?: never }; batch?: "call_tools" extends keyof Tools<C> ? false : boolean }) => Promise<Page<C>>;
+export type Connect<C> = <S extends Record<string, unknown> = {}, O extends Record<string, unknown> = {}>(options?: ConnectOptions<S, O> & { tools?: { [K in keyof Tools<C>]?: never }; batch?: "call_tools" extends keyof Tools<C> ? false : boolean }) => Promise<Page<C>>;
 /** Bind the page to its own app on the surface its build chose, and offer every tool to whichever agent is present. Most pages call the generated connect from #holon-ui. */
-export declare function connect<S extends Record<string, unknown> = {}>(
+export declare function connect<S extends Record<string, unknown> = {}, O extends Record<string, unknown> = {}>(
   app: { identity: Identity; contracts: Record<string, Contract | null>; own: string; /** The app's MCP endpoint on the page's origin, such as "/mcp/checkout". */ endpoint: string },
-  options?: ConnectOptions<S>,
+  options?: ConnectOptions<S, O>,
 ): Promise<Page<RuntimeClient>>;

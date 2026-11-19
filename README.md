@@ -70,6 +70,7 @@ const app = await connect({
     select_shapes: {
       description: "Select shapes on the board the person is looking at.",
       inputSchema: z.object({ ids: z.array(z.string()) }),
+      outputSchema: z.object({ selected: z.array(z.string()) }),
       annotations: { destructiveHint: false, openWorldHint: false },
       execute: ({ ids }) => ({ selected: board.select(ids) }),
     },

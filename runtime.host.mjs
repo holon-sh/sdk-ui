@@ -11,10 +11,14 @@ export async function connect({ identity, contracts, own }, { tools = {}, view: 
   const bind = session => bindApps(identity, contracts, { [own]: { session } })[own];
   const app = new App({ name: identity.name, version: identity.version }, {}, options);
   // Registered before connecting, so the view declares the tools capability in ui/initialize.
-  for (const [name, { description, inputSchema, annotations, execute }] of Object.entries(tools)) {
+  for (const [name, { description, inputSchema, outputSchema, annotations, execute }] of Object.entries(tools)) {
+    const output = outputSchema?.["~standard"];
     const run = async (input, { mcpReq: { signal } }) => {
       try {
-        return toolResult(await execute(input, { signal }));
+        const result = await execute(input, { signal });
+        const checked = output ? await output.validate(result) : { value: result };
+        if (checked.issues) throw new Error(`Invalid output for ${name}: ${JSON.stringify(checked.issues)}`);
+        return toolResult(checked.value);
       } catch (error) {
         // A tool's own failure is a result the agent can read, not a protocol error.
         // https://modelcontextprotocol.io/specification/2026-07-28/server/tools#error-handling
@@ -22,7 +26,7 @@ export async function connect({ identity, contracts, own }, { tools = {}, view: 
       }
     };
     // ext-apps validates input against inputSchema first, and calls a tool without one with the request context alone.
-    app.registerTool(name, { description, inputSchema, annotations }, inputSchema ? run : extra => run({}, extra));
+    app.registerTool(name, { description, inputSchema, outputSchema: output && { "~standard": { ...output, validate: value => ({ value }) } }, annotations }, inputSchema ? run : extra => run({}, extra));
   }
   // The host sends the call that opened the view once, right after the handshake, so listen before connecting.
   // https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx#data-passing
