@@ -1,10 +1,12 @@
 import { spawn } from "node:child_process"
+import { createRequire } from "node:module"
 import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { parseArgs } from "node:util"
-import { chromium } from "@playwright/test"
-import { isCorrect, task } from "./task.mjs"
+import { isCorrect, task } from "../vercel-ui/benchmarks/agent/harness/task.mjs"
+
+const { chromium } = createRequire(import.meta.resolve("../vercel-ui/benchmarks/agent/harness/task.mjs"))("@playwright/test")
 
 const { values: flags } = parseArgs({
   options: {

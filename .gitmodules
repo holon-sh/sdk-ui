@@ -1,0 +1,4 @@
+[submodule "benchmarks/agent/vercel-ui"]
+	path = benchmarks/agent/vercel-ui
+	url = https://github.com/vercel-labs/ui
+	ignore = dirty

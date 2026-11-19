@@ -9,10 +9,10 @@ import { Tabs } from "@base-ui/react/tabs";
 import { connect } from "holon-ui/runtime";
 import * as React from "react";
 import { createRoot } from "react-dom/client";
-import { channels, visibilities } from "../settings.mjs";
+import { channels, save as report, visibilities } from "../vercel-ui/benchmarks/agent/src/settings.ts";
 import { tools } from "../tools.mjs";
 import { z } from "zod";
-import "./styles.css";
+import "../vercel-ui/benchmarks/agent/src/styles.css";
 
 const screen = new URLSearchParams(location.search).get("screen");
 
@@ -35,7 +35,7 @@ const setRole = (id, role) => update({ members: draft.members.map(other => (othe
 const removeMember = id => update({ members: draft.members.filter(other => other.id !== id) });
 const setNotification = (channel, notification, on) => update({ [channel]: { ...draft[channel], [notification]: on } });
 const save = () => {
-  (window.__saved ??= []).push(structuredClone(draft));
+  report(draft);
   return app.tools.save_settings(draft);
 };
 

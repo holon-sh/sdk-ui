@@ -1,9 +1,11 @@
 import { spawn } from "node:child_process"
+import { createRequire } from "node:module"
 import path from "node:path"
-import { chromium } from "@playwright/test"
-import { isCorrect } from "./task.mjs"
+import { isCorrect } from "../vercel-ui/benchmarks/agent/harness/task.mjs"
 
-const child = spawn("node", [path.join(process.env.HOLON_BENCH, "server.mjs"), "--port", "5792", "--tools", "form"], { stdio: "ignore" })
+const { chromium } = createRequire(import.meta.resolve("../vercel-ui/benchmarks/agent/harness/task.mjs"))("@playwright/test")
+
+const child = spawn("node", [path.join(import.meta.dirname, "../server.mjs"), "--port", "5792", "--tools", "form"], { stdio: "ignore" })
 await new Promise((resolve) => setTimeout(resolve, 700))
 const browser = await chromium.launch()
 const page = await browser.newPage()

@@ -4,7 +4,7 @@ import { extname, join, normalize } from "node:path";
 import { parseArgs } from "node:util";
 import { createMcpHandler, fromJsonSchema, McpServer } from "@modelcontextprotocol/server";
 import { toNodeHandler } from "@modelcontextprotocol/node";
-import { initialSettings } from "./settings.mjs";
+import { initialSettings } from "./vercel-ui/benchmarks/agent/src/settings.ts";
 import { tools } from "./tools.mjs";
 
 const { values: flags } = parseArgs({ options: { port: { type: "string", default: "5700" }, tools: { type: "string", default: "domain" } } });

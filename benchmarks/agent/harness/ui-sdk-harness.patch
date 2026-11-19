@@ -53,7 +53,7 @@ index 483261d..af393f1 100644
 +  const { child } = run(
 +    "node",
 +    [
-+      path.join(process.env.HOLON_BENCH, "server.mjs"),
++      path.join(import.meta.dirname, "../../../../server.mjs"),
 +      "--port",
 +      String(port),
 +      "--tools",

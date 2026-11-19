@@ -2,7 +2,7 @@
 
 The ui-sdk agent benchmark ([vercel-labs/ui](https://github.com/vercel-labs/ui/tree/main/benchmarks/agent)) with holon-ui arms added. The task, the agent's prompt, the model and the check are theirs, unchanged.
 
-The app is their Base UI settings screen backed by an MCP server; the screen and its data are adapted from vercel-labs/ui, which is under the Apache 2.0 license. `connect()` offers tools through WebMCP; `server.mjs` puts a recording `document.modelContext` on the page when the harness asks with `?agent`.
+Their repository is the submodule `vercel-ui`, pinned to the commit these results were measured on. The app here is their Base UI settings screen backed by an MCP server: `ui/main.jsx` is adapted from their `src/screens/react-base-ui.tsx`, under the Apache 2.0 license, and imports their settings, their styles and their `save()` from the submodule. `connect()` offers tools through WebMCP; `server.mjs` puts a recording `document.modelContext` on the page when the harness asks with `?agent`.
 
 | Arm | What the agent gets | Judged by |
 | --- | --- | --- |
@@ -13,37 +13,39 @@ The app is their Base UI settings screen backed by an MCP server; the screen and
 | holon-ui page's tools | Server tools: `get_settings` and `save_settings`, the two the page itself calls | Server state |
 | holon-ui domain tools + batch | The five domain tools, with `batch: true` | Server state |
 
-Their check is `isCorrect(window.__saved)`, unchanged: the page's Save ran once with exactly the task's values. The form tools edit the form on screen, and `save_form` runs the same function as the Save button, so those arms pass it as written. The server-tool arms never run the page's Save, so the patch reads what the server stored for them instead; they are a separate comparison.
+Their check is `isCorrect(window.__saved)`, unchanged: the page's Save ran once with exactly the task's values. The form tools edit the form on screen, and `save_form` runs the same function as the Save button, which reports through their `save()`, so those arms pass it as written. The server-tool arms never run the page's Save, so the patch reads what the server stored for them instead; they are a separate comparison.
 
 The patch to their harness adds the arms, starts this app for them, waits for their tools to register, and reads the server's saves for the server-tool arms.
 
 ## Run it
 
-Build holon-ui at the repository root, then the app here, with `HOLON_BENCH` set to this folder:
+Fetch their repository and build holon-ui, from the repository root:
 
 ```sh
+git submodule update --init benchmarks/agent/vercel-ui
+npm ci
 npx tsc
 ```
 
-```sh
-npm install
-```
+Build the app, here:
 
 ```sh
+npm install
 npx vite build
 ```
 
-Then, in a clone of vercel-labs/ui at the commit in `harness/ui-sdk-commit.txt`:
+Add the holon-ui arms to their harness and run it:
 
 ```sh
-git apply "$HOLON_BENCH/harness/ui-sdk-harness.patch"
+cd vercel-ui
+git apply ../harness/ui-sdk-harness.patch
 pnpm install
 pnpm exec playwright install chromium
 cd benchmarks/agent
 node harness/bench.mjs --framework all --runs 3 --headless
 ```
 
-`harness/smoke-form.mjs` checks the form tools against their `isCorrect` without an agent, and `harness/probe-playwright-mcp.mjs` runs the real Playwright MCP server on one of their screens; copy either into their `harness` folder first. The probe needs their app started with `pnpm dev`.
+From here, once their dependencies are installed, `node harness/smoke-form.mjs` checks the form tools against their `isCorrect` without an agent, and `node harness/probe-playwright-mcp.mjs` runs the real Playwright MCP server on one of their screens, with their app started by `pnpm dev`.
 
 ## Results
 
