@@ -69,6 +69,14 @@ export interface OutputTypes {
     "get_order": { "Total": WithHyphenOutputTotal; };
   };
 }
+export interface Responses {
+  "checkout": {
+  };
+  "orders": {
+  };
+  "with-hyphen": {
+  };
+}
 export interface Resources {
   "checkout": {
     "orders://summary": { "total": number; };
@@ -98,7 +106,7 @@ export interface EventData {
 }
 export type Events = { readonly [A in keyof EventArguments]: { [K in keyof EventArguments[A]]: { arguments: EventArguments[A][K]; data: K extends keyof EventData[A] ? EventData[A][K] : unknown } } };
 
-export type Apps = { readonly [A in keyof Inputs]: ToolClient<Inputs[A], Outputs[A], Resources[A], Events[A]> };
+export type Apps = { readonly [A in keyof Inputs]: ToolClient<Inputs[A], Outputs[A], Resources[A], Events[A], Responses[A]> };
 export declare const connect: import("holon-ui/runtime").Connect<Apps["checkout"]>;
 export type { EndpointBinding, CreateOptions };
 export declare function createApps<K extends keyof Apps>(bindings: { [A in K]: EndpointBinding }, options?: CreateOptions): Pick<Apps,K>;
