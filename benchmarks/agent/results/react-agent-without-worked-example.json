@@ -1,0 +1,162 @@
+{
+  "framework": "react",
+  "model": "sonnet",
+  "rounds": [
+    [
+      {
+        "library": "ui-sdk",
+        "tools": "agent",
+        "calls": 8,
+        "chars": 7355,
+        "seconds": 19.079,
+        "tokens": 60979,
+        "cost": 0.0558851,
+        "correct": true,
+        "message": "Succeeded, using 8 tool calls (the first 7 were setup and the save, plus `done`). The save press returned no confirmation message, so I can't confirm it from the app.\n\n- The project is named Atlas and its visibility is Internal.\n- Priya Shah is now an admin.\n- Tom Becker is removed. I confirmed the dialog.\n- Email notifications: Deploy failures is on and Weekly digest is off. I didn't touch Slack.\n\nI read the values back before saving and they were correct. I guessed the menu item names \"Make admin\" and \"Remove\", and both worked on the first try.",
+        "turns": 9,
+        "usage": {
+          "input_tokens": 16,
+          "cache_creation_input_tokens": 7963,
+          "cache_read_input_tokens": 51111,
+          "output_tokens": 1889,
+          "output_tokens_details": {
+            "thinking_tokens": 0
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 7963,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 196,
+              "cache_read_input_tokens": 9100,
+              "cache_creation_input_tokens": 575,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 575
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        }
+      }
+    ],
+    [
+      {
+        "library": "ui-sdk",
+        "tools": "agent",
+        "calls": 8,
+        "chars": 7355,
+        "seconds": 19.74,
+        "tokens": 70304,
+        "cost": 0.0478043,
+        "correct": true,
+        "message": "Succeeded, with 8 tool calls (including `done`). The project is renamed to Atlas and visibility is Internal. Priya Shah is now an admin, and Tom Becker is removed after I confirmed the dialog. In Email notifications, Deploy failures is on and Weekly digest is off. I left Slack alone. The act results showed these values before I pressed Save, and the Save press raised no errors. I didn't re-read the page after saving. Nothing was hard. I guessed the menu item names \"Make admin\" and \"Remove\", and both worked on the first try.",
+        "turns": 9,
+        "usage": {
+          "input_tokens": 18,
+          "cache_creation_input_tokens": 5689,
+          "cache_read_input_tokens": 62723,
+          "output_tokens": 1874,
+          "output_tokens_details": {
+            "thinking_tokens": 0
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 5689,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 185,
+              "cache_read_input_tokens": 9446,
+              "cache_creation_input_tokens": 176,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 176
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        }
+      }
+    ],
+    [
+      {
+        "library": "ui-sdk",
+        "tools": "agent",
+        "calls": 9,
+        "chars": 10826,
+        "seconds": 20.137,
+        "tokens": 73407,
+        "cost": 0.05666130000000001,
+        "correct": true,
+        "message": "Succeeded, using 10 tool calls (including `done`).\n\nI renamed the project to Atlas and set visibility to Internal. I made Priya Shah an admin and removed Tom Becker after confirming the dialog. I turned on Deploy failures and turned off Weekly digest, leaving Slack alone. Before saving, the values showed all of these correctly. I pressed Save settings, and the page showed no error or confirmation message.\n\nNothing went wrong. I ran `done` in parallel with the Save call, which I shouldn't have done.",
+        "turns": 10,
+        "usage": {
+          "input_tokens": 18,
+          "cache_creation_input_tokens": 7454,
+          "cache_read_input_tokens": 63893,
+          "output_tokens": 2042,
+          "output_tokens_details": {
+            "thinking_tokens": 0
+          },
+          "server_tool_use": {
+            "web_search_requests": 0,
+            "web_fetch_requests": 0
+          },
+          "service_tier": "standard",
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 7454,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "inference_geo": "global",
+          "iterations": [
+            {
+              "input_tokens": 2,
+              "output_tokens": 178,
+              "cache_read_input_tokens": 10817,
+              "cache_creation_input_tokens": 570,
+              "cache_creation": {
+                "ephemeral_5m_input_tokens": 0,
+                "ephemeral_1h_input_tokens": 570
+              },
+              "type": "message"
+            }
+          ],
+          "speed": "standard",
+          "fallback_credit": null
+        }
+      }
+    ]
+  ],
+  "medians": [
+    {
+      "library": "ui-sdk",
+      "tools": "agent",
+      "calls": 8,
+      "chars": 7355,
+      "seconds": 19.74,
+      "tokens": 70304,
+      "cost": 0.0558851,
+      "correct": "3/3"
+    }
+  ]
+}

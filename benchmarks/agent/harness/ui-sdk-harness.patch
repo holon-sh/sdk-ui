@@ -1,0 +1,146 @@
+diff --git a/benchmarks/agent/harness/bench.mjs b/benchmarks/agent/harness/bench.mjs
+index 483261d..af393f1 100644
+--- a/benchmarks/agent/harness/bench.mjs
++++ b/benchmarks/agent/harness/bench.mjs
+@@ -20,6 +20,16 @@ const frameworks = {
+     { screen: "vue-ui-sdk", tools: "browser", library: "ui-sdk" },
+     { screen: "vue-ui-sdk", tools: "agent", library: "ui-sdk" },
+   ],
++  holon: [
++    { screen: "holon", tools: "browser", library: "holon-ui", serve: "domain", score: "page" },
++    { screen: "holon-form", tools: "agent", library: "holon-ui form tools", serve: "form", expect: 6, score: "page" },
++    { screen: "holon-form-batch", tools: "agent", library: "holon-ui form tools + batch", serve: "form", expect: 7, score: "page" },
++    { screen: "holon-domain", tools: "agent", library: "holon-ui domain tools", serve: "domain", expect: 5 },
++    { screen: "holon-page", tools: "agent", library: "holon-ui page's tools", serve: "page", expect: 2 },
++  ],
++  "holon-batch": [
++    { screen: "holon-batch", tools: "agent", library: "holon-ui domain tools + batch", serve: "domain", expect: 6 },
++  ],
+   svelte: [
+     { screen: "svelte-bits-ui", tools: "browser", library: "Bits UI" },
+     { screen: "svelte-ui-sdk", tools: "browser", library: "ui-sdk" },
+@@ -27,6 +37,12 @@ const frameworks = {
+   ],
+ }
+ 
++frameworks.all = [
++  ...frameworks.react,
++  ...frameworks.holon,
++  ...frameworks["holon-batch"],
++]
++
+ const { values: flags } = parseArgs({
+   options: {
+     framework: { type: "string", default: "react" },
+@@ -37,7 +53,9 @@ const { values: flags } = parseArgs({
+     out: { type: "string" },
+   },
+ })
+-const arms = frameworks[flags.framework]
++const arms = frameworks[flags.framework]?.filter(
++  (arm) => !process.env.ARMS || process.env.ARMS.split(",").includes(arm.tools)
++)
+ if (!arms) {
+   console.error(`Frameworks: ${Object.keys(frameworks).join(", ")}.`)
+   process.exit(1)
+@@ -119,10 +137,42 @@ async function appUrl() {
+ 
+ // Both get the same short system prompt and only Bash, limited to the one
+ // command, in an empty folder, so the numbers compare the tools and nothing else.
++async function serve(arm, round) {
++  const port = 5700 + round * 10 + arms.indexOf(arm)
++  const url = `http://127.0.0.1:${port}`
++  const { child } = run(
++    "node",
++    [
++      path.join(process.env.HOLON_BENCH, "server.mjs"),
++      "--port",
++      String(port),
++      "--tools",
++      arm.serve,
++    ],
++    {}
++  )
++  for (let tries = 0; tries < 50; tries++) {
++    if (await fetch(`${url}/__saved`).then((r) => r.ok, () => false)) {
++      return { url, child }
++    }
++    await new Promise((resolve) => setTimeout(resolve, 100))
++  }
++  throw new Error("The holon app didn't start.")
++}
++
+ async function operate(arm, round, app) {
+   const port = 5600 + arms.indexOf(arm)
++  const served = arm.serve ? await serve(arm, round) : null
++  if (served) {
++    app = served.url
++  }
+   const screen = await openScreen({
+     app,
++    expect: arm.expect,
++    saved:
++      served && arm.score !== "page"
++        ? () => fetch(`${served.url}/__saved`).then((r) => r.json())
++        : undefined,
+     port,
+     token,
+     screen: arm.screen,
+@@ -167,8 +217,11 @@ async function operate(arm, round, app) {
+     cost: result.total_cost_usd ?? 0,
+     correct: screen.stats.done && isCorrect(screen.stats.saved),
+     message: result.result ?? "",
++    turns: result.num_turns,
++    usage,
+   }
+   await screen.close()
++  served?.child.kill()
+   return measured
+ }
+ 
+@@ -225,7 +278,7 @@ if (check.is_error) {
+   process.exit(1)
+ }
+ 
+-const app = await appUrl()
++const app = arms.every((arm) => arm.serve) ? null : await appUrl()
+ const rounds = []
+ for (let round = 1; round <= Number(flags.runs); round++) {
+   const rows = await Promise.all(arms.map((arm) => operate(arm, round, app)))
+diff --git a/benchmarks/agent/harness/browser.mjs b/benchmarks/agent/harness/browser.mjs
+index 2408624..23ab9ff 100644
+--- a/benchmarks/agent/harness/browser.mjs
++++ b/benchmarks/agent/harness/browser.mjs
+@@ -53,6 +53,8 @@ async function openScreen({
+   headed = false,
+   x = 0,
+   width = 480,
++  expect,
++  saved,
+ }) {
+   mkdirSync(dir, { recursive: true })
+   const browser = await chromium.launch({
+@@ -67,6 +69,12 @@ async function openScreen({
+   await page.goto(`${app}/?${query}${tools === "agent" ? "&agent" : ""}`)
+   await page.waitForSelector("body[data-mounted]")
+ 
++  if (expect) {
++    await page.waitForFunction(
++      (count) => window.__agentTools?.length >= count,
++      expect
++    )
++  }
+   const described =
+     tools === "agent" ? await page.evaluate(() => window.__agentTools) : null
+   const available = described ? agentTools(page, described) : browserTools(page)
+@@ -82,7 +90,9 @@ async function openScreen({
+     const at = Date.now()
+     stats.calls++
+     if (tool === "done") {
+-      stats.saved = await page.evaluate(() => window.__saved ?? [])
++      stats.saved = saved
++        ? await saved()
++        : await page.evaluate(() => window.__saved ?? [])
+       stats.done = true
+       return "Done."
+     }
