@@ -13,7 +13,7 @@ const consumer = join(root, "consumer");
 after(() => rmSync(root, { recursive: true, force: true }));
 
 before(() => {
-  const packed = execFileSync("npm", ["pack", "--ignore-scripts", "--json", "--pack-destination", root], {
+  const packed = execFileSync("npm", ["pack", "--json", "--pack-destination", root], {
     cwd: repository,
     encoding: "utf8",
   });

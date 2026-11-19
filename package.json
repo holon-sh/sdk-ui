@@ -14,30 +14,27 @@
   },
   "exports": {
     "./runtime": {
-      "types": "./runtime.d.ts",
-      "mcp-app": "./runtime.host.mjs",
-      "default": "./runtime.web.mjs"
+      "types": "./dist/runtime.web.d.ts",
+      "mcp-app": "./dist/runtime.host.js",
+      "default": "./dist/runtime.web.js"
     },
     "./vite": {
-      "types": "./vite.d.ts",
-      "default": "./vite.mjs"
+      "types": "./dist/vite.d.ts",
+      "default": "./dist/vite.js"
     }
   },
   "files": [
-    "runtime.d.ts",
-    "runtime.host.mjs",
-    "runtime.web.mjs",
-    "vite.d.ts",
-    "vite.mjs",
+    "dist",
     "README.md"
   ],
   "scripts": {
-    "test": "node --test --test-timeout=30000 tests/*.test.mjs && node --conditions=mcp-app --test --test-timeout=30000 tests/mcp-app/*.test.mjs",
+    "prepack": "tsc",
+    "test": "tsc && node --test --test-timeout=30000 tests/*.test.mjs && node --conditions=mcp-app --test --test-timeout=30000 tests/mcp-app/*.test.mjs",
     "fixtures": "node scripts/fixtures.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/client": "^2.3.1",
-    "holon-sh": "^0.0.1-dev.23"
+    "holon-sh": "^0.0.1-dev.25"
   },
   "peerDependencies": {
     "@modelcontextprotocol/ext-apps": "^2.0.0"

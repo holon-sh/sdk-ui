@@ -1,9 +1,8 @@
 import type { App, AppOptions } from "@modelcontextprotocol/ext-apps";
 import type { StandardSchemaV1, StandardSchemaWithJSON, ToolAnnotations } from "@modelcontextprotocol/client";
-import type { EndpointBinding, Identity, Contract, RuntimeClient } from "holon-sh/runtime";
+import type { EndpointBinding, Identity, Contract, RuntimeClient, SessionClient, ToolClient } from "holon-sh/runtime";
 export type { CreateOptions, EndpointBinding, Identity, Contract, RuntimeClient } from "holon-sh/runtime";
 export type { AuthProvider, CallOptions, CallMetadata, ToolResult, ToolClient } from "holon-sh/runtime";
-export { bindApps, ToolCallError } from "holon-sh/runtime";
 
 /** A tool the page declares. It runs in the browser and acts on what the person is looking at. S and O are its input and output schemas' types. */
 export interface PageTool<S = undefined, O = undefined> {
@@ -15,7 +14,14 @@ export interface PageTool<S = undefined, O = undefined> {
   outputSchema?: O & StandardSchemaWithJSON;
   annotations?: ToolAnnotations;
   /** Receives validated input. Returns a JSON value, or a promise of one; throwing reports failure. signal aborts when the agent cancels. */
-  execute: (input: S extends StandardSchemaV1 ? StandardSchemaV1.InferOutput<S> : Record<string, never>, options: { signal: AbortSignal }) => O extends StandardSchemaV1 ? StandardSchemaV1.InferInput<O> | Promise<StandardSchemaV1.InferInput<O>> : unknown;
+  execute(input: S extends StandardSchemaV1 ? StandardSchemaV1.InferOutput<S> : Record<string, never>, options: { signal: AbortSignal }): O extends StandardSchemaV1 ? StandardSchemaV1.InferInput<O> | Promise<StandardSchemaV1.InferInput<O>> : unknown;
+}
+export interface AnyPageTool {
+  description: string;
+  inputSchema?: StandardSchemaWithJSON;
+  outputSchema?: StandardSchemaWithJSON;
+  annotations?: ToolAnnotations;
+  execute(input: unknown, options: { signal: AbortSignal }): unknown;
 }
 // S and O are inferred per tool. A tool without a schema leaves its slot unknown, so the slots are unconstrained.
 export interface ConnectOptions<S extends Record<string, unknown> = {}, O extends Record<string, unknown> = {}> {
@@ -28,19 +34,15 @@ export interface ConnectOptions<S extends Record<string, unknown> = {}, O extend
   /** The app's binding on a web page, in place of the generated one; its endpoint resolves against the page's origin. Ignored in an MCP Apps host. */
   web?: EndpointBinding;
 }
-type Tools<C> = C extends { tools: infer T } ? T : never;
+type Client = ToolClient<any, any, any, any>;
 /** The tool call that opened a view: typed by its tool, or untyped when the host does not say which tool it was. */
-export type Opened<C> =
-  | { [K in keyof Tools<C> & string]: Tools<C>[K] extends (input: infer I, ...rest: never[]) => Promise<infer O> ? { tool: K; input: I; output: O } : never }[keyof Tools<C> & string]
+export type Opened<C extends Client> =
+  | { [K in keyof C["tools"] & string]: C["tools"][K] extends (input: infer I, ...rest: never[]) => Promise<infer O> ? { tool: K; input: I; output: O } : never }[keyof C["tools"] & string]
   | { tool: undefined; input: Record<string, unknown>; output: unknown };
-type Resources<C> = C extends { readonly resources: infer R } ? R : never;
-/** What a view can do with its app: call its tools and read its resources. */
-type Relayed<C> = Pick<C, Extract<keyof C, "tools" | "callTool" | "close">> & {
-  readonly resources: { readonly [U in keyof Resources<C>]: Pick<Resources<C>[U], Extract<keyof Resources<C>[U], "read">> };
-};
 /** The page's own app C, as a view in an MCP Apps host or as a web page, told apart by view. Only a web page can list the app's tools, watch a resource or subscribe to events. close() also unregisters the page's tools and closes the view. */
-export type Page<C> =
-  | (Relayed<C> & {
+export type Page<C extends Client> =
+  | (SessionClient<C> & {
+    close(): Promise<void>;
     /** The connected ext-apps App, for host-only features. */
     readonly view: App;
     /** The tool call that opened the view, with the output its tool returns. */
@@ -52,9 +54,12 @@ export type Page<C> =
     readonly opened: undefined;
   });
 /** connect, narrowed by the generated #holon-ui module to the client C of the project's own app. A page tool cannot take the name of one of the app's tools. */
-export type Connect<C> = <S extends Record<string, unknown> = {}, O extends Record<string, unknown> = {}>(options?: ConnectOptions<S, O> & { tools?: { [K in keyof Tools<C>]?: never }; batch?: "call_tools" extends keyof Tools<C> ? false : boolean }) => Promise<Page<C>>;
-/** Bind the page to its own app on the surface its build chose, and offer every tool to whichever agent is present. Most pages call the generated connect from #holon-ui. */
-export declare function connect<S extends Record<string, unknown> = {}, O extends Record<string, unknown> = {}>(
-  app: { identity: Identity; contracts: Record<string, Contract | null>; own: string; /** The app's MCP endpoint on the page's origin, such as "/mcp/checkout". */ endpoint: string },
-  options?: ConnectOptions<S, O>,
-): Promise<Page<RuntimeClient>>;
+export type Connect<C extends Client> = <S extends Record<string, unknown> = {}, O extends Record<string, unknown> = {}>(options?: ConnectOptions<S, O> & { tools?: { [K in keyof C["tools"]]?: never }; batch?: "call_tools" extends keyof C["tools"] ? false : boolean }) => Promise<Page<C>>;
+export interface OwnApp {
+  identity: Identity;
+  contracts: Record<string, Contract | null>;
+  own: string;
+  /** The app's MCP endpoint on the page's origin, such as "/mcp/checkout". */
+  endpoint: string;
+}
+export type Runtime = <S extends Record<string, unknown> = {}, O extends Record<string, unknown> = {}>(app: OwnApp, options?: ConnectOptions<S, O>) => Promise<Page<RuntimeClient>>;
