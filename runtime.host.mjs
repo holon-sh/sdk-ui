@@ -12,9 +12,13 @@ export async function connect({ identity, contracts, own }, { tools = {}, view: 
   const app = new App({ name: identity.name, version: identity.version }, {}, options);
   // Registered before connecting, so the view declares the tools capability in ui/initialize.
   for (const [name, { description, inputSchema, outputSchema, annotations, execute }] of Object.entries(tools)) {
+    const output = outputSchema?.["~standard"];
     const run = async (input, { mcpReq: { signal } }) => {
       try {
-        return toolResult(await execute(input, { signal }));
+        const result = await execute(input, { signal });
+        const checked = output ? await output.validate(result) : { value: result };
+        if (checked.issues) throw new Error(`Invalid output for ${name}: ${JSON.stringify(checked.issues)}`);
+        return toolResult(checked.value);
       } catch (error) {
         // A tool's own failure is a result the agent can read, not a protocol error.
         // https://modelcontextprotocol.io/specification/2026-07-28/server/tools#error-handling
