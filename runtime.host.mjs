@@ -26,7 +26,7 @@ export async function connect({ identity, contracts, own }, { tools = {}, view: 
       }
     };
     // ext-apps validates input against inputSchema first, and calls a tool without one with the request context alone.
-    app.registerTool(name, { description, inputSchema, outputSchema, annotations }, inputSchema ? run : extra => run({}, extra));
+    app.registerTool(name, { description, inputSchema, outputSchema: output && { "~standard": { ...output, validate: value => ({ value }) } }, annotations }, inputSchema ? run : extra => run({}, extra));
   }
   // The host sends the call that opened the view once, right after the handshake, so listen before connecting.
   // https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx#data-passing
