@@ -8,6 +8,9 @@
   },
   "license": "Apache-2.0",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "sideEffects": false,
   "publishConfig": {
     "access": "public"
