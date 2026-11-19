@@ -17,10 +17,9 @@ export async function connect({ identity, contracts, own, endpoint }, { tools = 
     const offered = new Map();
     const register = tool => context.registerTool(tool, { signal }).then(() => true, error => console.warn(`WebMCP did not accept the tool ${tool.name}:`, error));
     const offer = async tool => await register(tool) && offered.set(tool.name, tool);
-    if (batch) register(batchTool(offered));
-    for (const [name, tool] of Object.entries(tools)) offer(pageTool(name, tool));
+    const offers = Object.entries(tools).map(([name, tool]) => offer(pageTool(name, tool)));
     const contracted = name => !contracts[own] || contracts[own].tools.some(tool => tool.name === name);
-    client.listTools({ signal }).then(
+    const listed = client.listTools({ signal }).then(
       ({ tools: listed }) => {
         for (const tool of listed) {
           // MCP Apps: a tool whose visibility omits "model" must not reach the agent; absent means ["model", "app"].
@@ -28,11 +27,12 @@ export async function connect({ identity, contracts, own, endpoint }, { tools = 
           // A typed client calls only its contract's tools, and an agent cannot write a file argument.
           if (!(tool._meta?.ui?.visibility ?? ["model"]).includes("model") || !contracted(tool.name)) continue;
           const inputSchema = withoutFiles(tool.inputSchema);
-          if (inputSchema !== FILE) offer(serverTool(own, client, tool, inputSchema));
+          if (inputSchema !== FILE) offers.push(offer(serverTool(own, client, tool, inputSchema)));
         }
       },
       error => signal.aborted || console.warn(`Could not list the tools of ${own} for WebMCP:`, error),
     );
+    if (batch) listed.then(() => Promise.all(offers)).then(() => offered.size && register(batchTool(offered)));
   }
   return Object.freeze({ ...client, view: undefined, opened: undefined, close: async () => { lifetime.abort(); await client.close(); } });
 }
@@ -65,12 +65,17 @@ function serverTool(own, client, tool, inputSchema) {
 }
 
 function batchTool(offered) {
-  const call = { type: "object", properties: { tool: { type: "string" }, input: { type: "object" } }, required: ["tool", "input"] };
+  const call = { type: "object", properties: { tool: { enum: [...offered.keys()] }, input: { type: "object" } }, required: ["tool", "input"] };
+  const members = [...offered.values()].map(tool => tool.annotations);
   return {
     name: "call_tools",
     description: "Run several of this page's tools in order, in one call. Stops at the first that fails, and returns the outputs before it and its error.",
     inputSchema: { type: "object", properties: { calls: { type: "array", items: call } }, required: ["calls"] },
-    annotations: hints(),
+    annotations: {
+      readOnlyHint: members.every(hint => hint.readOnlyHint),
+      consequentialHint: members.some(hint => hint.consequentialHint),
+      untrustedContentHint: members.some(hint => hint.untrustedContentHint),
+    },
     execute: async ({ calls }, client) => {
       const outputs = [];
       try {
